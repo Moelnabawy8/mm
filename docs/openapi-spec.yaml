@@ -1,0 +1,918 @@
+openapi: 3.0.3
+info:
+  title: ERP System API
+  description: |
+    Comprehensive API for ERP system covering HRM, CRM, Accounting, Project Management, Inventory, and more.
+    
+    ## Authentication
+    All endpoints (except public ones) require Bearer token authentication using Laravel Sanctum.
+    
+    ## Rate Limiting
+    - Authenticated requests: 60 per minute
+    - Unauthenticated requests: 10 per minute
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@yourdomain.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://yourdomain.com/api/v1
+    description: Production server
+  - url: http://localhost/api/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: Authentication and user management
+  - name: Dashboard
+    description: Dashboard statistics and data
+  - name: Employees
+    description: Employee management
+  - name: Attendance
+    description: Employee attendance tracking
+  - name: Leaves
+    description: Leave management
+  - name: Payroll
+    description: Payroll and salary management
+  - name: Departments
+    description: Department management
+  - name: Projects
+    description: Project management
+  - name: Tasks
+    description: Task management
+  - name: Customers
+    description: Customer management
+  - name: Leads
+    description: Lead management
+  - name: Deals
+    description: Deal management
+  - name: Invoices
+    description: Invoice management
+  - name: Bills
+    description: Bill management
+  - name: Vendors
+    description: Vendor management
+  - name: Products
+    description: Product/Service management
+  - name: Expenses
+    description: Expense tracking
+  - name: Reports
+    description: Various business reports
+  - name: Settings
+    description: System settings
+
+security:
+  - bearerAuth: []
+
+paths:
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and receive access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Login successfully
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: 1|abcdef123456...
+                      user:
+                        type: integer
+                        example: 1
+                      settings:
+                        type: object
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Revoke access token
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+
+  /profile:
+    get:
+      tags:
+        - Authentication
+      summary: Get user profile
+      description: Retrieve authenticated user's profile information
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  /dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard data
+      description: Retrieve main dashboard statistics
+      responses:
+        '200':
+          description: Dashboard data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      total_employees:
+                        type: integer
+                      total_customers:
+                        type: integer
+                      total_projects:
+                        type: integer
+                      total_revenue:
+                        type: number
+
+  /employees:
+    get:
+      tags:
+        - Employees
+      summary: Get all employees
+      description: Retrieve list of employees with pagination
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Employees retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      employees:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Employee'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags:
+        - Employees
+      summary: Create employee
+      description: Create a new employee record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeInput'
+      responses:
+        '201':
+          description: Employee created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/Employee'
+
+  /employees/{id}:
+    get:
+      tags:
+        - Employees
+      summary: Get employee details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Employee details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Employee'
+
+    put:
+      tags:
+        - Employees
+      summary: Update employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmployeeInput'
+      responses:
+        '200':
+          description: Employee updated successfully
+
+    delete:
+      tags:
+        - Employees
+      summary: Delete employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Employee deleted successfully
+
+  /attendance:
+    get:
+      tags:
+        - Attendance
+      summary: Get attendance records
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: employee_id
+          in: query
+          schema:
+            type: integer
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Attendance records retrieved
+
+    post:
+      tags:
+        - Attendance
+      summary: Mark attendance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - employee_id
+                - date
+                - status
+              properties:
+                employee_id:
+                  type: integer
+                date:
+                  type: string
+                  format: date
+                clock_in:
+                  type: string
+                  format: time
+                clock_out:
+                  type: string
+                  format: time
+                status:
+                  type: string
+                  enum: [present, absent, half_day, late]
+      responses:
+        '201':
+          description: Attendance marked successfully
+
+  /leaves:
+    get:
+      tags:
+        - Leaves
+      summary: Get leave requests
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - name: employee_id
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Leave requests retrieved
+
+    post:
+      tags:
+        - Leaves
+      summary: Create leave request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - employee_id
+                - leave_type_id
+                - start_date
+                - end_date
+                - reason
+              properties:
+                employee_id:
+                  type: integer
+                leave_type_id:
+                  type: integer
+                start_date:
+                  type: string
+                  format: date
+                end_date:
+                  type: string
+                  format: date
+                reason:
+                  type: string
+                total_days:
+                  type: integer
+      responses:
+        '201':
+          description: Leave request created
+
+  /projects:
+    get:
+      tags:
+        - Projects
+      summary: Get all projects
+      parameters:
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [in_progress, completed, on_hold]
+      responses:
+        '200':
+          description: Projects retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      projects:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Project'
+
+    post:
+      tags:
+        - Projects
+      summary: Create project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectInput'
+      responses:
+        '201':
+          description: Project created successfully
+
+  /tasks:
+    get:
+      tags:
+        - Tasks
+      summary: Get all tasks
+      parameters:
+        - name: project_id
+          in: query
+          schema:
+            type: integer
+        - name: assign_to
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tasks retrieved
+
+    post:
+      tags:
+        - Tasks
+      summary: Create task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskInput'
+      responses:
+        '201':
+          description: Task created
+
+  /customers:
+    get:
+      tags:
+        - Customers
+      summary: Get all customers
+      responses:
+        '200':
+          description: Customers retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      customers:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Customer'
+
+    post:
+      tags:
+        - Customers
+      summary: Create customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerInput'
+      responses:
+        '201':
+          description: Customer created
+
+  /invoices:
+    get:
+      tags:
+        - Invoices
+      summary: Get all invoices
+      parameters:
+        - name: customer_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, sent, paid, cancelled]
+      responses:
+        '200':
+          description: Invoices retrieved
+
+    post:
+      tags:
+        - Invoices
+      summary: Create invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceInput'
+      responses:
+        '201':
+          description: Invoice created
+
+  /reports/income-summary:
+    get:
+      tags:
+        - Reports
+      summary: Get income summary report
+      parameters:
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Income summary report
+
+  /reports/expense-summary:
+    get:
+      tags:
+        - Reports
+      summary: Get expense summary report
+      parameters:
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Expense summary report
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation successful
+        data:
+          type: object
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Error message
+        errors:
+          type: object
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        count:
+          type: integer
+        per_page:
+          type: integer
+        current_page:
+          type: integer
+        total_pages:
+          type: integer
+        links:
+          type: object
+          properties:
+            next:
+              type: string
+            prev:
+              type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        type:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        employee_id:
+          type: string
+        department_id:
+          type: integer
+        designation_id:
+          type: integer
+        branch_id:
+          type: integer
+        joining_date:
+          type: string
+          format: date
+        phone:
+          type: string
+        address:
+          type: string
+        salary:
+          type: number
+
+    EmployeeInput:
+      type: object
+      required:
+        - name
+        - email
+        - employee_id
+        - department_id
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        employee_id:
+          type: string
+        department_id:
+          type: integer
+        designation_id:
+          type: integer
+        branch_id:
+          type: integer
+        joining_date:
+          type: string
+          format: date
+        phone:
+          type: string
+        address:
+          type: string
+        salary:
+          type: number
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_name:
+          type: string
+        department_id:
+          type: integer
+        client_id:
+          type: integer
+        status:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        budget:
+          type: number
+        progress:
+          type: integer
+
+    ProjectInput:
+      type: object
+      required:
+        - project_name
+        - department_id
+      properties:
+        project_name:
+          type: string
+        department_id:
+          type: integer
+        client_id:
+          type: integer
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        budget:
+          type: number
+        description:
+          type: string
+        status:
+          type: string
+        estimated_hrs:
+          type: number
+        tags:
+          type: string
+        users:
+          type: array
+          items:
+            type: integer
+
+    TaskInput:
+      type: object
+      required:
+        - project_id
+        - name
+        - estimated_hrs
+        - priority
+        - stage_id
+        - start_date
+      properties:
+        project_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        estimated_hrs:
+          type: number
+        priority:
+          type: string
+          enum: [low, medium, high]
+        stage_id:
+          type: integer
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        assign_to:
+          type: string
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        billing_address:
+          type: string
+        balance:
+          type: number
+
+    CustomerInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        billing_name:
+          type: string
+        billing_address:
+          type: string
+        billing_city:
+          type: string
+        billing_state:
+          type: string
+        billing_zip:
+          type: string
+        billing_country:
+          type: string
+
+    InvoiceInput:
+      type: object
+      required:
+        - customer_id
+        - issue_date
+        - due_date
+      properties:
+        customer_id:
+          type: integer
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        category_id:
+          type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              product_id:
+                type: integer
+              quantity:
+                type: number
+              price:
+                type: number
+              discount:
+                type: number
+              tax:
+                type: number
+        discount:
+          type: number
+        tax:
+          type: number
+        total:
+          type: number

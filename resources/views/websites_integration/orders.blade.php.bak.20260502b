@@ -1,0 +1,77 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites — Orders') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('websites.dashboard') }}">{{ __('Websites') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Orders') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info"><i class="ti ti-info-circle me-1"></i> {{ __('Placeholder — WooCommerce orders will be loaded here once the API is connected.') }}</div>
+        </div>
+
+        @php
+            $stats = [
+                ['label' => __('Pending'),    'value' => '—', 'color' => 'warning'],
+                ['label' => __('Processing'), 'value' => '—', 'color' => 'info'],
+                ['label' => __('Completed'),  'value' => '—', 'color' => 'success'],
+                ['label' => __('Refunded'),   'value' => '—', 'color' => 'danger'],
+            ];
+        @endphp
+        @foreach ($stats as $s)
+            <div class="col-xl-3 col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <p class="text-muted mb-1">{{ $s['label'] }}</p>
+                        <h3 class="mb-0 text-{{ $s['color'] }}">{{ $s['value'] }}</h3>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ __('Recent Orders') }}</h5>
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" disabled>
+                            <option>{{ __('All Sites') }}</option>
+                        </select>
+                        <select class="form-select form-select-sm" disabled>
+                            <option>{{ __('All Statuses') }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body table-border-style">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('Order #') }}</th>
+                                    <th>{{ __('Site') }}</th>
+                                    <th>{{ __('Customer') }}</th>
+                                    <th>{{ __('Items') }}</th>
+                                    <th>{{ __('Total') }}</th>
+                                    <th>{{ __('Status') }}</th>
+                                    <th>{{ __('Date') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="7" class="text-center text-muted py-5">
+                                    <i class="ti ti-shopping-cart-off fs-1 d-block mb-2 opacity-50"></i>
+                                    {{ __('No orders yet. Connect the WooCommerce REST API to populate.') }}
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection

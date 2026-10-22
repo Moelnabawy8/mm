@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+/**
+ * Websites Integration — Phase 1 (View Only)
+ *
+ * Placeholder controller for the multi-site management dashboard.
+ * No API calls in this version — every method returns an empty UI shell.
+ * The pages are wired into the sidebar so we can validate the IA/UX
+ * before connecting WordPress / WooCommerce / LearnPress / GSC APIs.
+ */
+class WebsitesIntegrationController extends Controller
+{
+    public function dashboard()
+    {
+        return view('websites_integration.dashboard');
+    }
+
+    public function users()
+    {
+        return view('websites_integration.users');
+    }
+
+    public function orders()
+    {
+        return view('websites_integration.orders');
+    }
+
+    public function courses()
+    {
+        return view('websites_integration.courses');
+    }
+
+    public function blogs()
+    {
+        return view('websites_integration.blogs');
+    }
+
+    public function comments()
+    {
+        return view('websites_integration.comments');
+    }
+
+    public function seo()
+    {
+        return view('websites_integration.seo');
+    }
+
+    public function tracking()
+    {
+        return view('websites_integration.tracking');
+    }
+
+    public function subdomains()
+    {
+        return view('websites_integration.subdomains');
+    }
+}

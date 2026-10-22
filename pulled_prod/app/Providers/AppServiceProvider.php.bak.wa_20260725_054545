@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Providers;
+
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\URL;
+
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        //
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        Schema::defaultStringLength(191);
+
+        // Register VideoStreaming module views
+        $this->loadViewsFrom(base_path('Modules/VideoStreaming/Resources/views'), 'videostreaming');
+
+        // Register Guide module views
+        $this->loadViewsFrom(base_path('Modules/Guide/Resources/views'), 'guide');
+
+        URL::forceScheme('https');
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "name": "modules/publicrelations",
+    "description": "Public Relations CRM module for strategic partnerships, workshops and MoU/Contract pipelines.",
+    "authors": [
+        {
+            "name": "ERP System",
+            "email": "support@erp-system.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\PublicRelations\\": ""
+        }
+    }
+}

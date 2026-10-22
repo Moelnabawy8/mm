@@ -1,0 +1,12 @@
+{
+    "name": "PublicRelations",
+    "alias": "publicrelations",
+    "description": "Public Relations CRM: manage strategic partnerships with companies, factories, universities and institutions through interaction pipelines, milestones and dynamic custom fields.",
+    "keywords": ["pr", "public-relations", "crm", "partnerships"],
+    "priority": 0,
+    "providers": [
+        "Modules\\PublicRelations\\Providers\\PublicRelationsServiceProvider",
+        "Modules\\PublicRelations\\Providers\\RouteServiceProvider"
+    ],
+    "files": []
+}

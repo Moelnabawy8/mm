@@ -1,0 +1,193 @@
+{{ Form::model($leave, ['route' => ['leave.update', $leave->id], 'method' => 'PUT', 'class' => 'needs-validation', 'novalidate', 'enctype' => 'multipart/form-data']) }}
+<div class="modal-body">
+    {{-- start for ai module --}}
+    @php
+        $plan = \App\Models\Utility::getChatGPTSettings();
+    @endphp
+    @if ($plan->chatgpt == 1)
+        <div class="text-end">
+            <a href="#" data-size="md" class="btn  btn-primary btn-icon btn-sm" data-ajax-popup-over="true"
+                data-url="{{ route('generate', ['leave']) }}" data-bs-placement="top"
+                data-title="{{ __('Generate content with AI') }}">
+                <i class="fas fa-robot"></i> <span>{{ __('Generate with AI') }}</span>
+            </a>
+        </div>
+    @endif
+    {{-- end for ai module --}}
+
+    @if (\Auth::user()->type == 'company' || \Auth::user()->type == 'HR')
+        <div class="row">
+            <div class="col-md-12">
+                <div class="form-group">
+                    {{ Form::label('employee_id', __('Employee'), ['class' => 'form-label']) }}<x-required></x-required>
+                    {{ Form::select('employee_id', $employees, null, ['class' => 'form-control select', 'placeholder' => __('Select Employee'), 'required' => 'required']) }}
+                    <div class="text-xs mt-1">
+                        {{ __('Create employee here.') }} <a
+                            href="{{ route('employee.index') }}"><b>{{ __('Create employee') }}</b></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+    <div class="row">
+        <div class="col-md-12">
+            <div class="form-group">
+                {{ Form::label('leave_type_id', __('Leave Type'), ['class' => 'form-label']) }}<x-required></x-required>
+                {{ Form::select('leave_type_id', $leavetypes, null, ['class' => 'form-control select', 'placeholder' => __('Select Leave Type'), 'required' => 'required']) }}
+                <div class="text-xs mt-1">
+                    {{ __('Create leave type here.') }} <a
+                        href="{{ route('leavetype.index') }}"><b>{{ __('Create leave type') }}</b></a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="form-group">
+                {{ Form::label('start_date', __('Start Date'), ['class' => 'form-label']) }}<x-required></x-required>
+                {{ Form::date('start_date', null, ['class' => 'form-control', 'required' => 'required']) }}
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="form-group">
+                {{ Form::label('end_date', __('End Date'), ['class' => 'form-label']) }}<x-required></x-required>
+                {{ Form::date('end_date', null, ['class' => 'form-control', 'required' => 'required']) }}
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="form-group">
+                {{ Form::label('leave_reason', __('Leave Reason'), ['class' => 'form-label']) }}<x-required></x-required>
+                {{ Form::textarea('leave_reason', null, ['class' => 'form-control', 'placeholder' => __('Leave Reason'), 'required' => 'required']) }}
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12 text-end">
+            <a href="#" data-size="md" class="btn btn-primary btn-icon btn-sm text-right"
+                data-ajax-popup-over="true" id="grammarCheck" data-url="{{ route('grammar', ['grammar']) }}"
+                data-bs-placement="top" data-title="{{ __('Grammar check with AI') }}">
+                <i class="ti ti-rotate"></i> <span>{{ __('Grammar check with AI') }}</span>
+            </a>
+        </div>
+        <div class="col-md-12">
+            <div class="form-group">
+                {{ Form::label('remark', __('Remark'), ['class' => 'form-label']) }}<x-required></x-required>
+                {{ Form::textarea('remark', null, ['class' => 'form-control grammer_textarea', 'placeholder' => __('Leave Remark'), 'required' => 'required']) }}
+            </div>
+        </div>
+    </div>
+    @if (\Auth::user()->type == 'company' || \Auth::user()->type == 'HR')
+        <div class="row">
+            <div class="col-md-12">
+                <div class="form-group">
+                    {{ Form::label('status', __('Status')) }}
+                    <select name="status" id="" class="form-control select2">
+                        <option value="">{{ __('Select Status') }}</option>
+                        <option value="pending" @if ($leave->status == 'Pending') selected="" @endif>
+                            {{ __('Pending') }}
+                        </option>
+                        <option value="approval" @if ($leave->status == 'Approval') selected="" @endif>
+                            {{ __('Approval') }}
+                        </option>
+                        <option value="reject" @if ($leave->status == 'Reject') selected="" @endif>{{ __('Reject') }}
+                        </option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Current Attachments --}}
+    @if ($leave->attachments && $leave->attachments->count() > 0)
+        <div class="row">
+            <div class="col-md-12">
+                <div class="form-group">
+                    <label class="form-label">{{ __('Current Attachments') }}</label>
+                    <div class="d-flex flex-wrap gap-2" id="current-attachments">
+                        @foreach ($leave->attachments as $attachment)
+                            <div class="attachment-item border rounded p-2 d-flex align-items-center"
+                                id="attachment-{{ $attachment->id }}">
+                                <i class="{{ $attachment->file_icon }} me-2"></i>
+                                <a href="{{ $attachment->file_url }}" target="_blank" class="text-truncate"
+                                    style="max-width: 150px;">
+                                    {{ $attachment->original_name }}
+                                </a>
+                                <span class="text-muted ms-2 small">({{ $attachment->file_size_formatted }})</span>
+                                <button type="button" class="btn btn-sm btn-danger ms-2 delete-attachment"
+                                    data-id="{{ $attachment->id }}"
+                                    data-url="{{ route('leave.attachment.delete', $attachment->id) }}">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- New Attachments --}}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="form-group">
+                {{ Form::label('attachments', __('Add Attachments'), ['class' => 'form-label']) }}
+                <input type="file" name="attachments[]" id="attachments" class="form-control" multiple
+                    accept=".jpg,.jpeg,.png,.gif,.webp,.txt,.pdf,.doc,.docx">
+                <div class="text-xs mt-1 text-muted">
+                    {{ __('Allowed: Images (JPG, PNG, GIF, WebP), Documents (TXT, PDF, DOC, DOCX). Max 10MB per file.') }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+<div class="modal-footer">
+    <input type="button" value="{{ __('Cancel') }}" class="btn  btn-secondary" data-bs-dismiss="modal">
+    <input type="submit" value="{{ __('Update') }}" class="btn  btn-primary">
+</div>
+{{ Form::close() }}
+
+<script>
+    @if (\Auth::user()->type != 'company' && \Auth::user()->type != 'HR' && isset($employee_id))
+        var employee_id = "{{ $employee_id }}";
+        var leave_type_id = "{{ isset($leave) ? $leave->leave_type_id : null }}";
+        leaveCount(employee_id, leave_type_id)
+    @endif
+
+    // Handle attachment deletion
+    $(document).on('click', '.delete-attachment', function(e) {
+        e.preventDefault();
+        var button = $(this);
+        var attachmentId = button.data('id');
+        var url = button.data('url');
+
+        if (confirm("{{ __('Are you sure you want to delete this attachment?') }}")) {
+            $.ajax({
+                url: url,
+                type: 'DELETE',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#attachment-' + attachmentId).fadeOut(300, function() {
+                            $(this).remove();
+                            // Check if no attachments left
+                            if ($('#current-attachments').children().length === 0) {
+                                $('#current-attachments').closest('.row').remove();
+                            }
+                        });
+                        show_toastr('success', response.message, 'success');
+                    } else {
+                        show_toastr('error', response.message, 'error');
+                    }
+                },
+                error: function(xhr) {
+                    show_toastr('error', "{{ __('Error deleting attachment.') }}", 'error');
+                }
+            });
+        }
+    });
+</script>

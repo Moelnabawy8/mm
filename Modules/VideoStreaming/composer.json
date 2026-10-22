@@ -1,0 +1,21 @@
+{
+    "name": "modules/videostreaming",
+    "description": "Professional Video Streaming System with Google Drive Storage and HLS Encryption",
+    "authors": [
+        {
+            "name": "Developer",
+            "email": "developer@example.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\VideoStreaming\\": ""
+        }
+    }
+}

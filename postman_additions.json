@@ -1,0 +1,341 @@
+[
+    {
+        "name": "Leave Management",
+        "item": [
+            {
+                "name": "Get Leaves",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/leaves",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "leaves"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Create Leave",
+                "request": {
+                    "method": "POST",
+                    "url": {
+                        "raw": "{{base_url}}/leaves",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "leaves"
+                        ]
+                    },
+                    "body": {
+                        "mode": "raw",
+                        "raw": "{\"leave_type_id\": 1, \"start_date\": \"2024-02-01\", \"end_date\": \"2024-02-02\", \"reason\": \"Sick leave\"}",
+                        "options": {
+                            "raw": {
+                                "language": "json"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Payroll",
+        "item": [
+            {
+                "name": "Get Payslips",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/payroll/payslips",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "payroll",
+                            "payslips"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Create Payslip",
+                "request": {
+                    "method": "POST",
+                    "url": {
+                        "raw": "{{base_url}}/payroll/payslips",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "payroll",
+                            "payslips"
+                        ]
+                    },
+                    "body": {
+                        "mode": "raw",
+                        "raw": "{\"employee_id\": 1, \"month\": \"2024-01\"}",
+                        "options": {
+                            "raw": {
+                                "language": "json"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Departments & Designations",
+        "item": [
+            {
+                "name": "Get Departments",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/departments",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "departments"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Designations",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/designations",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "designations"
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "CRM - Leads & Deals",
+        "item": [
+            {
+                "name": "Get Leads",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/leads",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "leads"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Deals",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/deals",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "deals"
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Support Tickets",
+        "item": [
+            {
+                "name": "Get Tickets",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/tickets",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "tickets"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Create Ticket",
+                "request": {
+                    "method": "POST",
+                    "url": {
+                        "raw": "{{base_url}}/tickets",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "tickets"
+                        ]
+                    },
+                    "body": {
+                        "mode": "raw",
+                        "raw": "{\"subject\": \"Issue\", \"priority\": \"high\"}",
+                        "options": {
+                            "raw": {
+                                "language": "json"
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Financial - Bills & Vendors",
+        "item": [
+            {
+                "name": "Get Bills",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/bills",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "bills"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Vendors",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/vendors",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "vendors"
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Inventory - Products & Warehouses",
+        "item": [
+            {
+                "name": "Get Products",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/products",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "products"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Warehouses",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/warehouses",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "warehouses"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Purchases",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/purchases",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "purchases"
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "Admin - Users & Roles",
+        "item": [
+            {
+                "name": "Get Users",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/users",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "users"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Roles",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/roles",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "roles"
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "Get Settings",
+                "request": {
+                    "method": "GET",
+                    "url": {
+                        "raw": "{{base_url}}/settings",
+                        "host": [
+                            "{{base_url}}"
+                        ],
+                        "path": [
+                            "settings"
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+]

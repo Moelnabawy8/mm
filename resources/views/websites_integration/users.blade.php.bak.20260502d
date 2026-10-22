@@ -1,0 +1,79 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites — Users') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('websites.dashboard') }}">{{ __('Websites') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Users') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info"><i class="ti ti-shopping-cart me-1"></i>
+                {{ __('Showing') }} <strong>{{ count($users) }}</strong> {{ __('most recent customers from') }} <strong>my-communication.com</strong>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ __('Recent Customers') }}</h5>
+                    <span class="badge bg-light-success">{{ __('Live') }}</span>
+                </div>
+                <div class="card-body table-border-style">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>{{ __('Avatar') }}</th>
+                                    <th>{{ __('Name') }}</th>
+                                    <th>{{ __('Email') }}</th>
+                                    <th>{{ __('Orders') }}</th>
+                                    <th>{{ __('Total Spent') }}</th>
+                                    <th>{{ __('Status') }}</th>
+                                    <th>{{ __('Registered') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($users as $u)
+                                    <tr>
+                                        <td>{{ $u['id'] }}</td>
+                                        <td>
+                                            @if (!empty($u['avatar']))
+                                                <img src="{{ $u['avatar'] }}" alt="" class="rounded-circle" width="40" height="40" loading="lazy">
+                                            @else
+                                                <span class="avtar avtar-s bg-light-secondary"><i class="ti ti-user"></i></span>
+                                            @endif
+                                        </td>
+                                        <td><strong>{{ $u['name'] ?: '(no name)' }}</strong>@if(!empty($u['slug']))<br><small class="text-muted">@{{ $u['slug'] }}</small>@endif</td>
+                                        <td><small>{{ $u['description'] ?: '—' }}</small></td>
+                                        <td><span class="badge bg-light-primary">{{ number_format($u['orders_count'] ?? 0) }}</span></td>
+                                        <td><strong>{{ number_format($u['total_spent'] ?? 0, 2) }}</strong></td>
+                                        <td>
+                                            @if (!empty($u['is_paying']))
+                                                <span class="badge bg-light-success">{{ __('Paying') }}</span>
+                                            @else
+                                                <span class="badge bg-light-secondary">{{ __('Lead') }}</span>
+                                            @endif
+                                        </td>
+                                        <td><small>{{ !empty($u['date_created']) ? \Carbon\Carbon::parse($u['date_created'])->format('Y-m-d') : '—' }}</small></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="8" class="text-center text-muted py-5">
+                                        <i class="ti ti-cloud-off fs-1 d-block mb-2 opacity-50"></i>
+                                        {{ __('Could not fetch customers right now.') }}
+                                    </td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection

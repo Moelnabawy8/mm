@@ -1,0 +1,12 @@
+{
+    "No deal": "مفيش Deal",
+    "For leads created in the period: how many had an action (a sales meeting or a deal - a purchase or installments always come with a deal) and how many became a deal.": "للـ leads اللي اتعملت في الفترة دي: كام واحد اتعمل عليه Action (ميتنج مبيعات أو Deal - والشراء والأقساط دايماً معاهم Deal) وكام واحد اتحول Deal.",
+    "Deal status": "حالة الـ Deal",
+    "Any": "الكل",
+    "No status": "بدون حالة",
+    "Other statuses": "حالات تانية",
+    "Deal status per employee": "حالة الـ Deals لكل موظف",
+    "Leads by the status of their deals. A lead with several deals counts under each of their statuses.": "الـ leads حسب حالة الـ Deals بتاعتها. الـ lead اللي عليه أكتر من Deal بيتحسب تحت كل حالة منهم.",
+    "Where the leads created in the period stand now: by the status of their deals, and by how far each customer has gone (lead → sales meeting → deal → purchase → installments). In the journey each lead is counted once, at the furthest point it reached.": "الـ leads اللي اتعملت في الفترة دي واقفة فين دلوقتي: حسب حالة الـ Deals بتاعتها، وحسب العميل وصل لحد فين (lead ← ميتنج مبيعات ← Deal ← شراء ← أقساط). في رحلة العميل كل lead بيتحسب مرة واحدة، عند أبعد خطوة وصلها.",
+    "Leads created in the period that nobody is working: never had an action (a sales meeting or a deal), or their last action is older than the chosen number of days. Leads that already purchased, or whose latest deal is Won or Lost, are left out. Idle days = days since the last sales meeting or deal, or since the lead arrived if it never had one.": "الـ leads اللي اتعملت في الفترة دي ومحدش شغال عليها: ما اتعملهاش أي Action (ميتنج أو Deal)، أو آخر Action عليها أقدم من عدد الأيام المختار. الـ leads اللي اشترت، أو اللي آخر Deal عليها Won أو Lost، مش داخلة. أيام الخمول = الأيام من آخر ميتنج أو Deal، أو من يوم دخول الـ lead لو ما اتعملهاش حاجة."
+}

@@ -1,0 +1,77 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\MyCommunicationArService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+/**
+ * Websites Integration — Phase 1
+ *
+ * Aggregated multi-site dashboard. Currently wired to the Arabic site
+ * (my-communication.com) via WordPress + WooCommerce + LearnPress REST.
+ * Other sites will be added as their credentials are provided.
+ */
+class WebsitesIntegrationController extends Controller
+{
+    private MyCommunicationArService $ar;
+
+    public function __construct(MyCommunicationArService $ar)
+    {
+        $this->ar = $ar;
+    }
+
+    public function dashboard()
+    {
+        $kpis = $this->ar->getDashboardKpis();
+        return view('websites_integration.dashboard', compact('kpis'));
+    }
+
+    public function users()
+    {
+        $users = $this->ar->getUsers(20);
+        return view('websites_integration.users', compact('users'));
+    }
+
+    public function orders()
+    {
+        $orders = $this->ar->getOrders(20);
+        $stats  = $this->ar->getOrderStats();
+        return view('websites_integration.orders', compact('orders', 'stats'));
+    }
+
+    public function courses()
+    {
+        $courses = $this->ar->getCourses(20);
+        $total   = $this->ar->getCourseCount();
+        return view('websites_integration.courses', compact('courses', 'total'));
+    }
+
+    public function blogs()
+    {
+        $posts      = $this->ar->getPosts(15);
+        $categories = $this->ar->getCategories(20);
+        return view('websites_integration.blogs', compact('posts', 'categories'));
+    }
+
+    public function comments()
+    {
+        return view('websites_integration.comments');
+    }
+
+    public function seo()
+    {
+        return view('websites_integration.seo');
+    }
+
+    public function tracking()
+    {
+        return view('websites_integration.tracking');
+    }
+
+    public function subdomains()
+    {
+        return view('websites_integration.subdomains');
+    }
+}

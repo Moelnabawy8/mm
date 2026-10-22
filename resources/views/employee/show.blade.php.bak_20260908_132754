@@ -1,0 +1,456 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{__('Employee')}}
+@endsection
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{route('dashboard')}}">{{__('Dashboard')}}</a></li>
+    <li class="breadcrumb-item"><a href="{{route('employee.index')}}">{{__('Employee')}}</a></li>
+    <li class="breadcrumb-item">{{$employeesId}}</li>
+@endsection
+
+@section('action-btn')
+    @if(!empty($employee))
+        <div class="text-end">
+            <div class="d-flex flex-wrap align-items-center justify-content-md-end gap-2 drp-languages">
+                <ul class="list-unstyled mb-0">
+                    <li class="dropdown dash-h-item status-drp">
+                        <a class="dash-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
+                           role="button" aria-haspopup="false" aria-expanded="false">
+                            <span class="drp-text hide-mob text-primary"> {{__('Joining Letter')}}</span>
+                            <i class="ti ti-chevron-down drp-arrow nocolor hide-mob"></i>
+                        </a>
+                        <div class="dropdown-menu icon-dropdown dash-h-dropdown">
+                            <a href="{{route('joiningletter.download.pdf',$employee->id)}}" class=" btn-icon dropdown-item" data-bs-toggle="tooltip" data-bs-placement="top"  target="_blanks" ><i class="ti ti-download "></i>{{__('PDF')}}</a>
+
+                            <a href="{{route('joininglatter.download.doc',$employee->id)}}" class=" btn-icon dropdown-item" data-bs-toggle="tooltip" data-bs-placement="top"  target="_blanks" ><i class="ti ti-download "></i>{{__('DOC')}}</a>
+                        </div>
+                    </li>
+                </ul>
+                <ul class="list-unstyled mb-0">
+                    <li class="dropdown dash-h-item status-drp">
+                        <a class="dash-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
+                           role="button" aria-haspopup="false" aria-expanded="false">
+                            <span class="drp-text hide-mob text-primary"> {{__('Experience Certificate')}}</span>
+                            <i class="ti ti-chevron-down drp-arrow nocolor hide-mob"></i>
+                        </a>
+                        <div class="dropdown-menu icon-dropdown dash-h-dropdown">
+                            <a href="{{route('exp.download.pdf',$employee->id)}}" class=" btn-icon dropdown-item" data-bs-toggle="tooltip" data-bs-placement="top"  target="_blanks" ><i class="ti ti-download "></i>{{__('PDF')}}</a>
+
+                            <a href="{{route('exp.download.doc',$employee->id)}}" class=" btn-icon dropdown-item" data-bs-toggle="tooltip" data-bs-placement="top"  target="_blanks" ><i class="ti ti-download "></i>{{__('DOC')}}</a></a>
+                        </div>
+                    </li>
+                </ul>
+                <ul class="list-unstyled mb-0">
+                    <li class="dropdown dash-h-item status-drp">
+                        <a class="dash-head-link dropdown-toggle arrow-none me-0" data-bs-toggle="dropdown" href="#"
+                           role="button" aria-haspopup="false" aria-expanded="false">
+                            <span class="drp-text hide-mob text-primary"> {{__('NOC')}}</span>
+                            <i class="ti ti-chevron-down drp-arrow nocolor hide-mob"></i>
+                        </a>
+                        <div class="dropdown-menu icon-dropdown dash-h-dropdown">
+                            <a href="{{route('noc.download.pdf',$employee->id)}}" class=" btn-icon dropdown-item" data-bs-toggle="tooltip" data-bs-placement="top"  target="_blanks" ><i class="ti ti-download "></i>{{__('PDF')}}</a>
+
+                            <a href="{{route('noc.download.doc',$employee->id)}}" class=" btn-icon dropdown-item" data-bs-toggle="tooltip" data-bs-placement="top"  target="_blanks" ><i class="ti ti-download "></i>{{__('DOC')}}</a>
+                        </div>
+                    </li>
+                </ul>
+                @can('edit employee')
+                <a href="{{route('employee.edit',\Illuminate\Support\Facades\Crypt::encrypt($employee->id))}}" data-bs-toggle="tooltip" title="{{__('Edit')}}"class="btn btn-sm btn-info">
+                    <i class="ti ti-pencil"></i>
+                </a>
+            @endcan
+            </div>
+        </div>
+    @endif
+@endsection
+
+@section('content')
+    @if(!empty($employee))
+
+    {{-- Employment status banner + toggle --}}
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert {{ $employee->is_active ? 'alert-success' : 'alert-secondary' }} d-flex justify-content-between align-items-center mb-0">
+                <div>
+                    <strong>{{ __('Employment Status') }}:</strong>
+                    @if($employee->is_active)
+                        <span class="badge bg-success ms-2">{{ __('Current') }}</span>
+                    @else
+                        <span class="badge bg-secondary ms-2">{{ __('Former') }}</span>
+                    @endif
+                </div>
+                @can('edit employee')
+                    <form action="{{ route('employee.toggle-status', \Illuminate\Support\Facades\Crypt::encrypt($employee->id)) }}" method="POST" class="mb-0">
+                        @csrf
+                        <button type="submit"
+                                class="btn btn-sm {{ $employee->is_active ? 'btn-outline-danger' : 'btn-outline-success' }}"
+                                onclick="return confirm('{{ $employee->is_active ? __('Mark this employee as former?') : __('Restore this employee to current status?') }}');">
+                            {{ $employee->is_active ? __('Mark as Former') : __('Restore as Current') }}
+                        </button>
+                    </form>
+                @endcan
+            </div>
+        </div>
+    </div>
+
+    <div class="row gy-4">
+        <div class="col-md-6 col-12">
+            <div class="card h-100 mb-0">
+                <div class="card-header">
+                    <h5>{{ __('Personal Detail') }}</h5>
+                </div>
+                <div class="card-body employee-detail-body">
+                    
+                    <div class="row gy-2">
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('EmployeeId') }} : </strong>
+                                <span>{{ $employeesId }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info font-style">
+                                <strong class="font-bold">{{ __('Name') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->name : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info font-style">
+                                <strong class="font-bold">{{ __('Email') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->email : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Date of Birth') }} :</strong>
+                                <span>{{ \Auth::user()->dateFormat(!empty($employee) ? $employee->dob : '') }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Phone') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->phone : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Address') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->address : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Salary Type') }} :</strong>
+                                <span>{{ !empty($employee->salaryType) ? $employee->salaryType->name : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Basic Salary') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->salary : '' }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-12">
+            <div class="card h-100 mb-0">
+                <div class="card-header">
+                    <h5>{{ __('Company Detail') }}</h5>
+                </div>
+                <div class="card-body employee-detail-body">
+                    
+                    <div class="row gy-2">
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Branch') }} : </strong>
+                                <span>{{ !empty($employee->branch) ? $employee->branch->name : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Department') }} :</strong>
+                                <span>{{ !empty($employee->department) ? $employee->department->name : '' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Designation') }} :</strong>
+                                <span>{{ !empty($employee->designation) ? $employee->designation->name : '' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Date Of Joining') }} :</strong>
+                                <span>{{ \Auth::user()->dateFormat(!empty($employee) ? $employee->company_doj : '') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-12">
+            <div class="card h-100 mb-0">
+                <div class="card-header">
+                    <h5>{{ __('Document Detail') }}</h5>
+                </div>
+                <div class="card-body employee-detail-body">
+                    
+                    <div class="row gy-2">
+                        @php
+
+                            $employeedoc = !empty($employee)
+                                ? $employee->documents()->pluck('document_value', __('document_id'))
+                                : [];
+                        @endphp
+                        @if (!$documents->isEmpty())
+                            @foreach ($documents as $key => $document)
+                                <div class="col-sm-6 col-12">
+                                    <div class="info">
+                                        <strong class="font-bold">{{ $document->name }} : </strong>
+                                        <span><a href="{{ !empty($employeedoc[$document->id]) ? asset(Storage::url('uploads/document')) . '/' . $employeedoc[$document->id] : '' }}"
+                                                target="_blank">{{ !empty($employeedoc[$document->id]) ? $employeedoc[$document->id] : '' }}</a></span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="text-center">
+                                No Document Type Added.!
+                            </div>
+                        @endif
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-12">
+            <div class="card h-100 mb-0">
+                <div class="card-header">
+                    <h5>{{ __('Bank Account Detail') }}</h5>
+                </div>
+                <div class="card-body employee-detail-body">
+                    
+                    <div class="row gy-2">
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Account Holder Name') }} : </strong>
+                                <span>{{ !empty($employee) ? $employee->account_holder_name : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Account Number') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->account_number : '' }}</span>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Bank Name') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->bank_name : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Bank Identifier Code') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->bank_identifier_code : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Branch Location') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->branch_location : '' }}</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-12">
+                            <div class="info">
+                                <strong class="font-bold">{{ __('Tax Payer Id') }} :</strong>
+                                <span>{{ !empty($employee) ? $employee->tax_payer_id : '' }}</span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Leave Balance (current year) --}}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card mb-0">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ __('Leave Balance') }} <small class="text-muted">({{ date('Y') }})</small></h5>
+                        <span class="badge bg-light-primary">{{ __('Live — computed from approvals') }}</span>
+                    </div>
+                    <div class="card-body">
+                        @if (empty($leaveBalances))
+                            <p class="text-muted mb-0 text-center py-3">{{ __('No leave types configured yet.') }}</p>
+                        @else
+                            <div class="row gy-3">
+                                @foreach ($leaveBalances as $b)
+                                    @php
+                                        $pctUsed = $b['days'] > 0 ? min(100, round(($b['total_leave'] / $b['days']) * 100)) : 0;
+                                        $barClass = $pctUsed >= 90 ? 'bg-danger' : ($pctUsed >= 60 ? 'bg-warning' : 'bg-success');
+                                        $rowId    = 'waLb-' . $b['id'];
+                                    @endphp
+                                    <div class="col-md-6 col-lg-4 col-12">
+                                        <div class="p-3 border rounded h-100">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <strong class="text-dark">{{ $b['title'] }}</strong>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="badge bg-light-primary">{{ $b['remaining'] }} / {{ $b['days'] }} {{ __('days') }}</span>
+                                                    @can('edit employee')
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-outline-primary p-1"
+                                                                data-bs-toggle="collapse"
+                                                                data-bs-target="#{{ $rowId }}"
+                                                                title="{{ __('Edit allocation') }}"
+                                                                style="line-height:1; padding:2px 6px !important;">
+                                                            <i class="ti ti-pencil"></i>
+                                                        </button>
+                                                    @endcan
+                                                </div>
+                                            </div>
+                                            <div class="progress" style="height:6px;">
+                                                <div class="progress-bar {{ $barClass }}" role="progressbar"
+                                                     style="width: {{ $pctUsed }}%"
+                                                     aria-valuenow="{{ $pctUsed }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                            <small class="text-muted d-block mt-2">
+                                                {{ __('Used') }}: <b>{{ $b['total_leave'] }}</b> ·
+                                                {{ __('Remaining') }}: <b class="text-primary">{{ $b['remaining'] }}</b>
+                                            </small>
+
+                                            @can('edit employee')
+                                                <div class="collapse mt-3" id="{{ $rowId }}">
+                                                    <form action="{{ route('employee.leave-balance.update', \Illuminate\Support\Facades\Crypt::encrypt($employee->id)) }}" method="POST" class="mt-2">
+                                                        @csrf
+                                                        <input type="hidden" name="leave_type_id" value="{{ $b['id'] }}">
+                                                        <label class="form-label small mb-1">{{ __('Annual allocation (days)') }}</label>
+                                                        <div class="input-group input-group-sm">
+                                                            <input type="number" name="allocation" min="0" max="365"
+                                                                   value="{{ $b['days'] }}"
+                                                                   class="form-control" required>
+                                                            <button type="submit" class="btn btn-primary">{{ __('Save') }}</button>
+                                                        </div>
+                                                        <small class="text-muted d-block mt-1">
+                                                            {{ __('Set back to the default to remove the override.') }}
+                                                        </small>
+                                                    </form>
+                                                </div>
+                                            @endcan
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Performance & Productivity (last 30 days) — Activity Tracking module --}}
+        @if($employee && $employee->user_id)
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card mb-0">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{{ __('Performance & Productivity') }} <small class="text-muted">({{ __('last 30 days') }})</small></h5>
+                        <span class="badge bg-light-primary">{{ __('Auto-computed') }}</span>
+                    </div>
+                    <div class="card-body" id="atProfileWidget">
+                        <div class="text-muted text-center py-3"><i class="ti ti-loader"></i> {{ __('Loading…') }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+        (function() {
+            const userId = {{ (int) $employee->user_id }};
+            const url = "{{ url('/activity/performance') }}/" + userId;
+            const wrap = document.getElementById('atProfileWidget');
+            if (!wrap) return;
+
+            function stars(n) {
+                const filled = Math.max(0, Math.min(5, parseInt(n||0,10)));
+                return '★'.repeat(filled) + '☆'.repeat(5 - filled);
+            }
+            function pct(v) { return ((parseFloat(v||0)) * 100).toFixed(1) + '%'; }
+
+            function placeholder(text, color) {
+                const p = document.createElement('p');
+                p.className = 'text-muted text-center py-3';
+                if (color) p.classList.add(color);
+                p.textContent = text;
+                return p;
+            }
+
+            function metric(labelText, valueText, valueClass) {
+                const col = document.createElement('div');
+                col.className = 'col-md-3 col-6 text-center';
+                const lbl = document.createElement('div');
+                lbl.className = 'text-muted small';
+                lbl.textContent = labelText;
+                const val = document.createElement('div');
+                val.className = 'h4 mb-0 ' + (valueClass || '');
+                val.textContent = valueText;
+                col.appendChild(lbl);
+                col.appendChild(val);
+                return col;
+            }
+
+            fetch(url, { credentials: 'same-origin', headers: { 'Accept':'application/json' } })
+                .then(r => r.json())
+                .then(d => {
+                    wrap.replaceChildren();
+                    if (!d.enabled) {
+                        wrap.appendChild(placeholder('Activity tracking is currently disabled.'));
+                        return;
+                    }
+                    if (!d.days) {
+                        wrap.appendChild(placeholder('No performance data yet — score is computed nightly from task time.'));
+                        return;
+                    }
+                    const row = document.createElement('div');
+                    row.className = 'row gy-3 align-items-center';
+
+                    // Stars
+                    const starsCol = document.createElement('div');
+                    starsCol.className = 'col-md-3 col-6 text-center';
+                    const starsLabel = document.createElement('div');
+                    starsLabel.className = 'text-muted small';
+                    starsLabel.textContent = 'Rating';
+                    const starsValue = document.createElement('div');
+                    starsValue.className = 'h3 mb-0';
+                    starsValue.style.color = '#f5b400';
+                    starsValue.style.letterSpacing = '2px';
+                    starsValue.textContent = stars(d.stars);
+                    starsCol.appendChild(starsLabel);
+                    starsCol.appendChild(starsValue);
+
+                    row.appendChild(starsCol);
+                    row.appendChild(metric('Score',         (d.score * 100).toFixed(0) + '%', 'text-primary'));
+                    row.appendChild(metric('Productivity',  pct(d.productivity), 'text-success'));
+                    row.appendChild(metric('Idle ratio',    pct(d.idle_ratio), parseFloat(d.idle_ratio) > 0.3 ? 'text-warning' : ''));
+                    wrap.appendChild(row);
+
+                    const note = document.createElement('div');
+                    note.className = 'text-muted small text-center mt-3';
+                    note.textContent = 'Based on ' + d.days + ' days of tracked activity.';
+                    wrap.appendChild(note);
+                })
+                .catch(() => {
+                    wrap.replaceChildren();
+                    wrap.appendChild(placeholder('Could not load performance data.'));
+                });
+        })();
+        </script>
+        @endif
+
+        </div>
+    @endif
+@endsection

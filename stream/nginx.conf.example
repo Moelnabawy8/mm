@@ -1,0 +1,59 @@
+server {
+    listen 80;
+    server_name yourdomain.com;
+    root /var/www/securestream/public;
+
+    index index.php;
+
+    charset utf-8;
+    client_max_body_size 10G;
+
+    # Security Headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # Disable directory listing
+    autoindex off;
+
+    # Block direct access to sensitive files
+    location ~ /\.(env|git|htaccess|htpasswd) {
+        deny all;
+        return 404;
+    }
+
+    # Block direct access to HLS segments and keys
+    location ~ \.(ts|m3u8|key)$ {
+        deny all;
+        return 404;
+    }
+
+    # Block access to storage directory
+    location /storage {
+        deny all;
+        return 404;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+        fastcgi_read_timeout 3600;
+    }
+
+    # Deny access to hidden files
+    location ~ /\. {
+        deny all;
+    }
+}

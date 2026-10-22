@@ -1,0 +1,12 @@
+{
+    "name": "VideoStreaming",
+    "alias": "videostreaming",
+    "description": "Professional Video Streaming System with Google Drive Storage and HLS Encryption",
+    "keywords": ["video", "streaming", "hls", "encryption", "google-drive"],
+    "priority": 0,
+    "providers": [
+        "Modules\\VideoStreaming\\Providers\\VideoStreamingServiceProvider",
+        "Modules\\VideoStreaming\\Providers\\AddMenuProvider"
+    ],
+    "files": []
+}

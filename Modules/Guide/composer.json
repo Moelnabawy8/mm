@@ -1,0 +1,21 @@
+{
+    "name": "modules/guide",
+    "description": "Complete ERP System Guide with Video Tutorials and Documentation",
+    "authors": [
+        {
+            "name": "ERP System",
+            "email": "support@erp-system.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Guide\\": ""
+        }
+    }
+}

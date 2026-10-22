@@ -1,0 +1,11 @@
+*
+!private/
+!public/
+!uploads/
+!chunks/
+!hls/
+!encryption_keys/
+!temp/
+!.gitignore
+!.gitkeep
+!*/.gitkeep

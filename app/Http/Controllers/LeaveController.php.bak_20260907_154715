@@ -1,0 +1,510 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Employee;
+use App\Models\Leave;
+use App\Models\LeaveAttachment;
+use App\Models\LeaveType;
+use App\Models\Utility;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+class LeaveController extends Controller
+{
+    public function index()
+    {
+
+        if (\Auth::user()->can('manage leave') || !\Auth::user()->isHrOrCompany()) {
+            if (\Auth::user()->isHrOrCompany()) {
+                $leaves = Leave::where('created_by', '=', \Auth::user()->creatorId())->with(['leaveType', 'employees'])->withCount('attachments')->get();
+
+            } else {
+                $user = \Auth::user();
+                $employee = Employee::where('user_id', '=', $user->id)->first();
+                $leaves = Leave::where('employee_id', '=', $employee->id)->with(['leaveType', 'employees'])->withCount('attachments')->get();
+            }
+
+            return view('leave.index', compact('leaves'));
+        } else {
+            return redirect()->back()->with('error', __('Permission denied.'));
+        }
+    }
+
+    public function create()
+    {
+        if (\Auth::user()->can('create leave') || !\Auth::user()->isHrOrCompany()) {
+            $employee_id = null;
+            if (\Auth::user()->isHrOrCompany()) {
+                $employees = Employee::where('created_by', '=', \Auth::user()->creatorId())->get()->pluck('name', 'id');
+            } else {
+                $employees = Employee::where('user_id', '=', \Auth::user()->id)->get()->pluck('name', 'id');
+                $employee = \Auth::user()->employee;
+                $employee_id = isset($employee) ? $employee->id : null;
+            }
+            $leavetypes = LeaveType::where('created_by', '=', \Auth::user()->creatorId())->get();
+
+            return view('leave.create', compact('employees', 'leavetypes', 'employee_id'));
+        } else {
+            return response()->json(['error' => __('Permission denied.')], 401);
+        }
+    }
+
+    public function store(Request $request)
+    {
+
+        if (\Auth::user()->can('create leave') || !\Auth::user()->isHrOrCompany()) {
+            $validator = \Validator::make(
+                $request->all(),
+                [
+                    'leave_type_id' => 'required',
+                    'start_date' => 'required',
+                    'end_date' => 'required',
+                    'leave_reason' => 'required',
+                    'remark' => 'required',
+                ]
+            );
+            if ($validator->fails()) {
+                $messages = $validator->getMessageBag();
+                return redirect()->back()->with('error', $messages->first());
+            }
+
+
+            $employee = Employee::where('user_id', '=', Auth::user()->id)->first();
+            $leave_type = LeaveType::find($request->leave_type_id);
+            $startDate = new \DateTime($request->start_date);
+            $endDate = new \DateTime($request->end_date);
+            $endDate->add(new \DateInterval('P1D'));
+            $total_leave_days = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+
+            // Resolve target employee_id (HR picks from dropdown, self-serve uses own)
+            $targetEmployeeId = (\Auth::user()->isHrOrCompany())
+                ? $request->employee_id
+                : optional($employee)->id;
+
+            // Validate against REMAINING balance — not just allocation.
+            // Uses the same computed balance shown on the profile, so the numbers
+            // the user sees are the numbers the validator enforces.
+            $balances = self::computeLeaveBalances($targetEmployeeId, \Auth::user()->creatorId());
+            $remaining = null;
+            foreach ($balances as $b) {
+                if ($b['id'] == $request->leave_type_id) { $remaining = $b['remaining']; break; }
+            }
+            if ($remaining === null) {
+                return redirect()->back()->with('error', __('Invalid leave type for this employee.'));
+            }
+            if ($total_leave_days > $remaining) {
+                return redirect()->back()->with('error', __('Requested :req days exceeds the remaining balance of :rem days for :type.', [
+                    'req'  => $total_leave_days,
+                    'rem'  => $remaining,
+                    'type' => $leave_type ? $leave_type->title : '',
+                ]));
+            }
+
+            if (true) {
+                $leave = new Leave();
+                if (\Auth::user()->isHrOrCompany()) {
+                    $leave->employee_id = $request->employee_id;
+                } else {
+                    $leave->employee_id = $employee->id;
+                }
+
+                $leave->leave_type_id = $request->leave_type_id;
+                $leave->applied_on = date('Y-m-d');
+                $leave->start_date = $request->start_date;
+                $leave->end_date = $request->end_date;
+                $leave->total_leave_days = $total_leave_days;
+                $leave->leave_reason = $request->leave_reason;
+                $leave->remark = $request->remark;
+                $leave->status = 'Pending';
+                $leave->created_by = \Auth::user()->creatorId();
+
+                $leave->save();
+
+                // Handle attachments
+                if ($request->hasFile('attachments')) {
+                    $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'txt', 'pdf', 'doc', 'docx'];
+                    $maxSize = 10 * 1024 * 1024; // 10MB
+
+                    $uploadDir = base_path('uploads/leave_attachments/' . $leave->id);
+                    if (!file_exists($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    foreach ($request->file('attachments') as $file) {
+                        $extension = strtolower($file->getClientOriginalExtension());
+                        if (!in_array($extension, $allowedTypes)) {
+                            continue;
+                        }
+                        if ($file->getSize() > $maxSize) {
+                            continue;
+                        }
+
+                        // Save file info BEFORE moving (move destroys temp file)
+                        $originalName = $file->getClientOriginalName();
+                        $mimeType = $file->getClientMimeType();
+                        $fileSize = $file->getSize();
+
+                        $fileName = time() . '_' . Str::random(10) . '.' . $extension;
+                        $filePath = 'uploads/leave_attachments/' . $leave->id . '/' . $fileName;
+                        $file->move($uploadDir, $fileName);
+
+                        LeaveAttachment::create([
+                            'leave_id' => $leave->id,
+                            'file_name' => $fileName,
+                            'original_name' => $originalName,
+                            'file_type' => $mimeType,
+                            'file_size' => $fileSize,
+                            'file_path' => $filePath,
+                            'uploaded_by' => Auth::id(),
+                        ]);
+                    }
+                }
+
+                // Notify the employer (creator) when a regular employee submits a leave.
+                // When HR/company creates the leave on behalf of an employee, skip this —
+                // they triggered the action themselves and don't need an email to themselves.
+                if (!\Auth::user()->isHrOrCompany()) {
+                    $setting = Utility::settings();
+                    $employee = Employee::find($leave->employee_id);
+                    $user = User::find($leave->created_by);
+                    if (isset($setting['new_leave']) && $setting['new_leave'] == 1) {
+                        $leaveArr = [
+                            'user_name' => $user->name,
+                            'start_date' => $leave->start_date,
+                            'end_date' => $leave->end_date,
+                            'leave_reason' => $leave->leave_reason,
+                            'employee_name' => $employee->name,
+                        ];
+                        $resp = Utility::sendEmailTemplate('new_leave', [$user->id => $user->email], $leaveArr);
+                    }
+                }
+                return redirect()->route('leave.index')->with('success', __('Leave successfully created.'));
+            } else {
+                return redirect()->back()->with('error', __('Leave type ' . $leave_type->name . ' is provide maximum ' . $leave_type->days . "  days please make sure your selected days is under " . $leave_type->days . ' days.'));
+            }
+        } else {
+            return redirect()->back()->with('error', __('Permission denied.'));
+        }
+    }
+
+    public function show(Leave $leave)
+    {
+        return redirect()->route('leave.index');
+    }
+
+    public function edit(Leave $leave)
+    {
+        if (\Auth::user()->can('edit leave') || !\Auth::user()->isHrOrCompany()) {
+            if ($leave->created_by == \Auth::user()->creatorId()) {
+                if (\Auth::user()->isHrOrCompany()) {
+                    $employees = Employee::where('created_by', '=', \Auth::user()->creatorId())->get()->pluck('name', 'id');
+                } else {
+                    $employees = Employee::where('user_id', '=', \Auth::user()->id)->get()->pluck('name', 'id');
+                }
+
+                $employee = $leave->employees;
+                $employee_id = isset($employee) ? $employee->id : null;
+                $leavetypes = LeaveType::where('created_by', '=', \Auth::user()->creatorId())->get()->pluck('title', 'id');
+
+                return view('leave.edit', compact('leave', 'employees', 'leavetypes', 'employee_id'));
+            } else {
+                return response()->json(['error' => __('Permission denied.')], 401);
+            }
+        } else {
+            return response()->json(['error' => __('Permission denied.')], 401);
+        }
+    }
+
+    public function update(Request $request, $leave)
+    {
+
+        $leave = Leave::find($leave);
+        if (\Auth::user()->can('edit leave') || !\Auth::user()->isHrOrCompany()) {
+            if ($leave->created_by == Auth::user()->creatorId()) {
+                $validator = \Validator::make(
+                    $request->all(),
+                    [
+                        'leave_type_id' => 'required',
+                        'start_date' => 'required',
+                        'end_date' => 'required',
+                        'leave_reason' => 'required',
+                        'remark' => 'required',
+                    ]
+                );
+                if ($validator->fails()) {
+                    $messages = $validator->getMessageBag();
+
+                    return redirect()->back()->with('error', $messages->first());
+                }
+
+                $leave_type = LeaveType::find($request->leave_type_id);
+
+                $startDate = new \DateTime($request->start_date);
+                $endDate = new \DateTime($request->end_date);
+                $endDate->add(new \DateInterval('P1D'));
+                $total_leave_days = !empty($startDate->diff($endDate)) ? $startDate->diff($endDate)->days : 0;
+                if ($leave_type->days >= $total_leave_days) {
+
+                    // Only update employee_id if user is company or HR
+                    if (\Auth::user()->isHrOrCompany()) {
+                        $leave->employee_id = $request->employee_id;
+                    }
+                    $leave->leave_type_id = $request->leave_type_id;
+                    $leave->start_date = $request->start_date;
+                    $leave->end_date = $request->end_date;
+                    $leave->total_leave_days = $total_leave_days;
+                    $leave->leave_reason = $request->leave_reason;
+                    $leave->remark = $request->remark;
+                    if ($request->has('status')) {
+                        if ($request->status == 'approval') {
+                            $leave->status = 'Approved';
+                        } elseif ($request->status == 'reject') {
+                            $leave->status = 'Reject';
+                        } elseif ($request->status == 'pending') {
+                            $leave->status = 'Pending';
+                        } else {
+                            $leave->status = $request->status;
+                        }
+                    }
+
+                    $leave->save();
+
+                    // Handle new attachments
+                    if ($request->hasFile('attachments')) {
+                        $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'txt', 'pdf', 'doc', 'docx'];
+                        $maxSize = 10 * 1024 * 1024; // 10MB
+
+                        $uploadDir = base_path('uploads/leave_attachments/' . $leave->id);
+                        if (!file_exists($uploadDir)) {
+                            mkdir($uploadDir, 0755, true);
+                        }
+
+                        foreach ($request->file('attachments') as $file) {
+                            $extension = strtolower($file->getClientOriginalExtension());
+                            if (!in_array($extension, $allowedTypes)) {
+                                continue;
+                            }
+                            if ($file->getSize() > $maxSize) {
+                                continue;
+                            }
+
+                            // Save file info BEFORE moving (move destroys temp file)
+                            $originalName = $file->getClientOriginalName();
+                            $mimeType = $file->getClientMimeType();
+                            $fileSize = $file->getSize();
+
+                            $fileName = time() . '_' . Str::random(10) . '.' . $extension;
+                            $filePath = 'uploads/leave_attachments/' . $leave->id . '/' . $fileName;
+                            $file->move($uploadDir, $fileName);
+
+                            LeaveAttachment::create([
+                                'leave_id' => $leave->id,
+                                'file_name' => $fileName,
+                                'original_name' => $originalName,
+                                'file_type' => $mimeType,
+                                'file_size' => $fileSize,
+                                'file_path' => $filePath,
+                                'uploaded_by' => Auth::id(),
+                            ]);
+                        }
+                    }
+
+                    return redirect()->route('leave.index')->with('success', __('Leave successfully updated.'));
+                } else {
+                    return redirect()->back()->with('error', __('Leave type ' . $leave_type->name . ' is provide maximum ' . $leave_type->days . "  days please make sure your selected days is under " . $leave_type->days . ' days.'));
+                }
+            } else {
+                return redirect()->back()->with('error', __('Permission denied.'));
+            }
+        } else {
+            return redirect()->back()->with('error', __('Permission denied.'));
+        }
+    }
+
+    public function destroy(Leave $leave)
+    {
+        if (\Auth::user()->can('delete leave') || !\Auth::user()->isHrOrCompany()) {
+            if ($leave->created_by == \Auth::user()->creatorId()) {
+                $leave->delete();
+
+                return redirect()->route('leave.index')->with('success', __('Leave successfully deleted.'));
+            } else {
+                return redirect()->back()->with('error', __('Permission denied.'));
+            }
+        } else {
+            return redirect()->back()->with('error', __('Permission denied.'));
+        }
+    }
+
+    public function action($id)
+    {
+        $leave = Leave::find($id);
+        $employee = Employee::find($leave->employee_id);
+        $leavetype = LeaveType::find($leave->leave_type_id);
+
+        return view('leave.action', compact('employee', 'leavetype', 'leave'));
+    }
+
+    public function changeaction(Request $request)
+    {
+        $leave = Leave::find($request->leave_id);
+
+        $leave->status = $request->status;
+        if ($leave->status == 'Approval') {
+            $startDate = new \DateTime($leave->start_date);
+            $endDate = new \DateTime($leave->end_date);
+            $endDate->add(new \DateInterval('P1D'));
+            $total_leave_days = $startDate->diff($endDate)->days;
+            $leave->total_leave_days = $total_leave_days;
+            $leave->status = 'Approved';
+        }
+
+        $leave->save();
+
+
+        //Send Email
+        $setings = Utility::settings();
+        if (!empty($employee->id)) {
+            if ($setings['leave_action_sent'] == 1) {
+
+                $employee = Employee::where('id', $leave->employee_id)->where('created_by', '=', \Auth::user()->creatorId())->first();
+                $leave->name = !empty($employee->name) ? $employee->name : '';
+                $leave->email = !empty($employee->email) ? $employee->email : '';
+
+                $actionArr = [
+
+                    'leave_name' => !empty($employee->name) ? $employee->name : '',
+                    'leave_status' => $leave->status,
+                    'leave_reason' => $leave->leave_reason,
+                    'leave_start_date' => $leave->start_date,
+                    'leave_end_date' => $leave->end_date,
+                    'total_leave_days' => $leave->total_leave_days,
+                ];
+                $resp = Utility::sendEmailTemplate('leave_action_sent', [$employee->id => $employee->email], $actionArr);
+
+
+                return redirect()->route('leave.index')->with('success', __('Leave status successfully updated.') . (($resp['is_success'] == false && !empty($resp['error'])) ? '<br> <span class="text-danger">' . $resp['error'] . '</span>' : ''));
+
+            }
+
+        }
+
+        return redirect()->route('leave.index')->with('success', __('Leave status successfully updated.'));
+    }
+
+
+    public function jsoncount(Request $request)
+    {
+        return self::computeLeaveBalances($request->employee_id, \Auth::user()->creatorId());
+    }
+
+    /**
+     * Compute the leave-balance snapshot for ONE employee, scoped to the
+     * company (creator) that owns the leave-type catalog.
+     *
+     * Balance is derived — not stored — so it stays in sync automatically
+     * with approvals and rejections. Counts leaves where status != 'Reject'
+     * and that fall within the current calendar year (partially or fully);
+     * leaves that straddle the year boundary are pro-rated.
+     *
+     * Returns an array of rows:
+     *   [ ['id' => int, 'title' => string, 'days' => int (allocation),
+     *      'total_leave' => int (used), 'remaining' => int], ... ]
+     *
+     * An OPTIONAL per-employee override (table: employee_leave_balances)
+     * replaces the default `leave_types.days` allocation when a row exists.
+     * When the table is absent (older installs) we silently skip the lookup.
+     */
+    public static function computeLeaveBalances($employeeId, $creatorId = null)
+    {
+        if (empty($employeeId)) return [];
+        if (is_null($creatorId)) {
+            $creatorId = \Auth::check() ? \Auth::user()->creatorId() : null;
+        }
+
+        $year = date('Y');
+        $leave_types = LeaveType::where('created_by', $creatorId)->get();
+
+        // Try to read per-employee overrides (table is optional, may not exist yet)
+        $overrides = [];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('employee_leave_balances')) {
+                $overrideRows = \Illuminate\Support\Facades\DB::table('employee_leave_balances')
+                    ->where('employee_id', $employeeId)
+                    ->get();
+                foreach ($overrideRows as $row) {
+                    $overrides[$row->leave_type_id] = (int) $row->allocation;
+                }
+            }
+        } catch (\Throwable $e) { /* fail soft — fall back to defaults */ }
+
+        $out = [];
+        foreach ($leave_types as $type) {
+            $counts = Leave::select(\DB::raw('
+                COALESCE(SUM(
+                    CASE
+                        WHEN YEAR(start_date) = ? AND YEAR(end_date) = ? THEN total_leave_days
+                        WHEN YEAR(start_date) = ? THEN DATEDIFF(LAST_DAY(start_date), start_date) + 1
+                        WHEN YEAR(end_date) = ? THEN DATEDIFF(end_date, DATE_FORMAT(end_date, "%Y-01-01")) + 1
+                        ELSE 0
+                    END
+                ), 0) AS total_leave
+            '))
+                ->where('leave_type_id', $type->id)
+                ->where('employee_id', $employeeId)
+                ->where('status', '!=', 'Reject')
+                ->where(function ($q) use ($year) {
+                    $q->whereYear('start_date', $year)->orWhereYear('end_date', $year);
+                })
+                ->addBinding([$year, $year, $year, $year], 'select')
+                ->first();
+
+            $used       = $counts ? (int) $counts['total_leave'] : 0;
+            $allocation = isset($overrides[$type->id]) ? $overrides[$type->id] : (int) $type->days;
+            $remaining  = max(0, $allocation - $used);
+
+            $out[] = [
+                'id'          => $type->id,
+                'title'       => $type->title,
+                'days'        => $allocation,
+                'total_leave' => $used,
+                'remaining'   => $remaining,
+            ];
+        }
+        return $out;
+    }
+
+
+    /**
+     * Delete a leave attachment.
+     */
+    public function deleteAttachment($id)
+    {
+        $attachment = LeaveAttachment::find($id);
+
+        if (!$attachment) {
+            return response()->json(['success' => false, 'message' => __('Attachment not found.')], 404);
+        }
+
+        $leave = Leave::find($attachment->leave_id);
+
+        if (!$leave || $leave->created_by != Auth::user()->creatorId()) {
+            return response()->json(['success' => false, 'message' => __('Permission denied.')], 403);
+        }
+
+        // Delete file from uploads folder
+        $fullPath = base_path($attachment->file_path);
+        if (file_exists($fullPath)) {
+            unlink($fullPath);
+        }
+
+        $attachment->delete();
+
+        return response()->json(['success' => true, 'message' => __('Attachment deleted successfully.')]);
+    }
+}

@@ -1,0 +1,645 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Controllers\Controller;
+use App\Models\ProjectUser;
+use App\Models\User;
+use App\Traits\ApiResponser;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use App\Models\AssignProject;
+use App\Models\Project;
+use App\Models\Utility;
+use App\Models\Tag;
+use App\Models\ProjectTask;
+use App\Models\TimeTracker;
+use App\Models\TrackPhoto;
+use App\Models\Department;
+use App\Models\Bug;
+use App\Models\TaskComment;
+use App\Models\TaskFile;
+use App\Models\ActivityLog;
+use App\Models\Milestone;
+use App\Models\BugComment;
+use App\Models\BugFile;
+use App\Models\Document;
+
+use Illuminate\Support\Facades\Validator;
+
+
+class ApiController extends Controller
+{
+    //
+    use ApiResponser;
+
+    public function login(Request $request)
+    {
+
+        $attr = $request->validate([
+            'email' => 'required|string|email|',
+            'password' => 'required|string'
+        ]);
+
+        if (!Auth::attempt($attr)) {
+            return $this->error('Credentials not match', 401);
+        }
+
+        $settings = Utility::settings(auth()->user()->id);
+
+        $settings = [
+            'shot_time' => isset($settings['interval_time']) ? $settings['interval_time'] : 0.5,
+        ];
+
+        return $this->success([
+            'token' => auth()->user()->createToken('API Token')->plainTextToken,
+            'user' => auth()->user()->id,
+            'settings' => $settings,
+        ], 'Login successfully.');
+    }
+    public function logout()
+    {
+        auth()->user()->tokens()->delete();
+        return $this->success([], 'Tokens Revoked');
+    }
+    public function getDepartments(Request $request)
+    {
+        $user = auth()->user();
+        $departments = Department::where('created_by', '=', $user->creatorId())->get();
+
+        return $this->success([
+            'departments' => $departments,
+        ], 'Get Department List successfully.');
+    }
+    public function getDepartmentProjects(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'department_id' => 'required|integer|exists:departments,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $user = auth()->user();
+
+        if ($user->type != 'company') {
+            $assign_pro_ids = ProjectUser::where('user_id', $user->id)->pluck('project_id');
+            $query = Project::whereIn('id', $assign_pro_ids);
+        } else {
+            $query = Project::where('created_by', $user->id);
+        }
+
+        $query->where('department_id', $request->department_id);
+
+        $projects = $query->get()->toArray();
+
+        return $this->success([
+            'projects' => $projects,
+        ], 'Get Project List successfully.');
+    }
+    public function createProject(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'project_name' => 'required',
+            'department_id' => 'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $project = new Project();
+        $project->project_name = $request->project_name;
+        $project->start_date = date("Y-m-d H:i:s", strtotime($request->start_date));
+        $project->end_date = isset($request->end_date) ? date("Y-m-d H:i:s", strtotime($request->end_date)) : null;
+
+        if ($request->has('project_image') && !empty($request->project_image)) {
+            $image_base64 = base64_decode($request->project_image);
+            $file = $request->image_name ?? 'project_' . time() . '.png';
+            $folder = 'projects/';
+            $app_path = storage_path($folder);
+
+            if (!file_exists($app_path)) {
+                mkdir($app_path, 0777, true);
+            }
+
+            $file_name = $app_path . $file;
+            file_put_contents($file_name, $image_base64);
+            $project->project_image = 'projects/' . $file;
+        }
+
+        $project->department_id = $request->department_id;
+        $project->client_id = $request->client_id ?? 0;
+        $project->budget = !empty($request->budget) ? $request->budget : 0;
+        $project->description = $request->description;
+        $project->status = $request->status ?? 'in_progress';
+        $project->estimated_hrs = $request->estimated_hrs ?? 0;
+        $project->tags = $request->tags;
+        $project->created_by = auth()->user()->creatorId();
+        $project->copylinksetting = '{"member":"on","milestone":"off","basic_details":"on","activity":"off","attachment":"on","bug_report":"on","task":"off","tracker_details":"off","timesheet":"off" ,"password_protected":"off"}';
+
+        $project->save();
+
+        if (auth()->user()->type == 'company') {
+            ProjectUser::create([
+                'project_id' => $project->id,
+                'user_id' => Auth::user()->id,
+            ]);
+        } else {
+            ProjectUser::create([
+                'project_id' => $project->id,
+                'user_id' => Auth::user()->creatorId(),
+            ]);
+
+            ProjectUser::create([
+                'project_id' => $project->id,
+                'user_id' => Auth::user()->id,
+            ]);
+        }
+
+        // Add Invited Users
+        if ($request->has('users') && is_array($request->users)) {
+            foreach ($request->users as $user_id) {
+                ProjectUser::create([
+                    'project_id' => $project->id,
+                    'user_id' => $user_id,
+                ]);
+            }
+        }
+
+        return $this->success(['project' => $project], 'Project created successfully.');
+    }
+    public function updateProject(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|integer|exists:projects,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $project = Project::find($request->project_id);
+
+        // Permission check can be added here
+
+        if ($request->has('project_name')) {
+            $project->project_name = $request->project_name;
+        }
+
+        if ($request->has('start_date')) {
+            $project->start_date = date("Y-m-d H:i:s", strtotime($request->start_date));
+        }
+
+        if ($request->has('end_date')) {
+            $project->end_date = date("Y-m-d H:i:s", strtotime($request->end_date));
+        }
+
+        if ($request->has('project_image') && !empty($request->project_image)) {
+            // Delete old image if needed, or just overwrite reference
+            $image_base64 = base64_decode($request->project_image);
+            $file = $request->image_name ?? 'project_' . time() . '.png';
+            $folder = 'projects/';
+            $app_path = storage_path($folder);
+
+            if (!file_exists($app_path)) {
+                mkdir($app_path, 0777, true);
+            }
+
+            $file_name = $app_path . $file;
+            file_put_contents($file_name, $image_base64);
+            $project->project_image = 'projects/' . $file;
+        }
+
+        if ($request->has('budget'))
+            $project->budget = $request->budget;
+        if ($request->has('client_id'))
+            $project->client_id = $request->client_id;
+        if ($request->has('description'))
+            $project->description = $request->description;
+        if ($request->has('status'))
+            $project->status = $request->status;
+        if ($request->has('estimated_hrs'))
+            $project->estimated_hrs = $request->estimated_hrs;
+        if ($request->has('tags'))
+            $project->tags = $request->tags;
+        if ($request->has('department_id'))
+            $project->department_id = $request->department_id;
+
+        $project->save();
+
+        return $this->success(['project' => $project], 'Project updated successfully.');
+    }
+    public function deleteProject(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|integer|exists:projects,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        Project::deleteProject($request->project_id);
+
+        return $this->success([], 'Project deleted successfully.');
+    }
+    public function duplicateProject(Request $request)
+    {
+        // Same hazard as ProjectController@copyprojectstore: the clone loops re-save every
+        // task and comment, firing the model events the WhatsApp observers listen to.
+        \App\Support\WhatsApp\WhatsAppGate::suppressForRequest();
+
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|integer|exists:projects,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $project = Project::find($request->project_id);
+        $duplicate = new Project();
+        $duplicate->project_name = $project->project_name . ' (Copy)';
+        $duplicate->status = $project->status;
+        $duplicate->project_image = $project->project_image;
+        $duplicate->client_id = $project->client_id;
+        $duplicate->description = $project->description;
+        $duplicate->department_id = $project->department_id;
+        $duplicate->start_date = $project->start_date;
+        $duplicate->end_date = $project->end_date;
+        $duplicate->estimated_hrs = $project->estimated_hrs;
+        $duplicate->created_by = auth()->user()->creatorId();
+        $duplicate->save();
+
+        if ($request->has('user') && is_array($request->user)) {
+            // If user array is passed in request, use it? Or copy from project?
+            // Web controller logic: calls project->id's users but also accepts request->user?
+            // Wait, the web logic checks `if (isset($request->user) && in_array("user", $request->user))`.
+            // This implies "user" string in the array meant "copy users".
+            // Let's stick to the plan: flags for deep copy.
+
+            if (in_array("user", $request->user)) {
+                $users = ProjectUser::where('project_id', $project->id)->get();
+                foreach ($users as $user) {
+                    $new_user = new ProjectUser();
+                    $new_user->user_id = $user->user_id;
+                    $new_user->project_id = $duplicate->id;
+                    $new_user->save();
+                }
+            }
+        } else {
+            // If no specific instruction or "user" flag not present, maybe just assign current user?
+            // Web logic: if NOT in array user, assign auth user.
+            $objUser = Auth::user();
+            $new_user = new ProjectUser();
+            $new_user->user_id = $objUser->id;
+            $new_user->project_id = $duplicate->id;
+            $new_user->save();
+        }
+
+        if ($request->has('task') && is_array($request->task) && in_array("task", $request->task)) {
+            $tasks = ProjectTask::where('project_id', $project->id)->get();
+            foreach ($tasks as $task) {
+                $project_task = new ProjectTask();
+                $project_task->name = $task->name;
+                $project_task->description = $task->description;
+                $project_task->estimated_hrs = $task->estimated_hrs;
+                $project_task->start_date = $task->start_date;
+                $project_task->end_date = $task->end_date;
+                $project_task->priority = $task->priority;
+                $project_task->priority_color = $task->priority_color;
+                $project_task->assign_to = $task->assign_to;
+                $project_task->project_id = $duplicate->id;
+                $project_task->milestone_id = $task->milestone_id;
+                $project_task->stage_id = $task->stage_id;
+                $project_task->order = $task->order;
+                $project_task->created_by = auth()->user()->creatorId();
+                $project_task->is_favourite = $task->is_favourite;
+                $project_task->is_complete = $task->is_complete;
+                $project_task->marked_at = $task->marked_at;
+                $project_task->progress = $task->progress;
+                $project_task->save();
+
+                if (in_array("task_comment", $request->task)) {
+                    $task_comments = TaskComment::where('task_id', $task->id)->get();
+                    foreach ($task_comments as $task_comment) {
+                        $comment = new TaskComment();
+                        $comment->comment = $task_comment->comment;
+                        $comment->task_id = $project_task->id;
+                        $comment->user_id = !empty($task_comment) ? $task_comment->user_id : 0;
+                        $comment->user_type = $task_comment->user_type;
+                        $comment->created_by = $task_comment->created_by;
+                        $comment->save();
+                    }
+                }
+
+                if (in_array("task_files", $request->task)) {
+                    $task_files = TaskFile::where('task_id', $task->id)->get();
+                    foreach ($task_files as $task_file) {
+                        $file = new TaskFile();
+                        $file->file = $task_file->file;
+                        $file->name = $task_file->name;
+                        $file->extension = $task_file->extension;
+                        $file->file_size = $task_file->file_size;
+                        $file->created_by = $task_file->created_by;
+                        $file->task_id = $project_task->id;
+                        $file->user_type = $task_file->user_type;
+                        $file->save();
+                    }
+                }
+            }
+        }
+
+        if ($request->has('bug') && is_array($request->bug) && in_array("bug", $request->bug)) {
+            $bugs = Bug::where('project_id', $project->id)->get();
+            foreach ($bugs as $bug) {
+                $project_bug = new Bug();
+                $project_bug->bug_id = $bug->bug_id;
+                $project_bug->project_id = $duplicate->id;
+                $project_bug->title = $bug->title;
+                $project_bug->priority = $bug->priority;
+                $project_bug->start_date = $bug->start_date;
+                $project_bug->due_date = $bug->due_date;
+                $project_bug->description = $bug->description;
+                $project_bug->status = $bug->status;
+                $project_bug->order = $bug->order;
+                $project_bug->assign_to = $bug->assign_to;
+                $project_bug->created_by = auth()->user()->creatorId();
+                $project_bug->save();
+
+                if (in_array("bug_comment", $request->bug)) {
+                    $bug_comments = BugComment::where('bug_id', $bug->id)->get();
+                    foreach ($bug_comments as $bug_comment) {
+                        $bugcomment = new BugComment();
+                        $bugcomment->comment = $bug_comment->comment;
+                        $bugcomment->bug_id = $project_bug->id;
+                        $bugcomment->user_type = $bug_comment->user_type;
+                        $bugcomment->created_by = $bug_comment->created_by;
+                        $bugcomment->save();
+                    }
+                }
+
+                if (in_array("bug_files", $request->bug)) {
+                    $bug_files = BugFile::where('bug_id', $bug->id)->get();
+                    foreach ($bug_files as $bug_file) {
+                        $bugfile = new BugFile();
+                        $bugfile->file = $bug_file->file;
+                        $bugfile->name = $bug_file->name;
+                        $bugfile->extension = $bug_file->extension;
+                        $bugfile->file_size = $bug_file->file_size;
+                        $bugfile->bug_id = $project_bug->id;
+                        $bugfile->user_type = $bug_file->user_type;
+                        $bugfile->created_by = $bug_file->created_by;
+                        $bugfile->save();
+                    }
+                }
+            }
+        }
+
+        if ($request->has('milestone') && is_array($request->milestone) && in_array("milestone", $request->milestone)) {
+            $milestones = Milestone::where('project_id', $project->id)->get();
+            foreach ($milestones as $milestone) {
+                $post = new Milestone();
+                $post->project_id = $duplicate->id;
+                $post->title = $milestone->title;
+                $post->status = $milestone->status;
+                $post->due_date = $milestone->due_date;
+                $post->start_date = $milestone->start_date;
+                $post->cost = $milestone->cost;
+                $post->progress = $milestone->progress;
+                $post->save();
+            }
+        }
+
+        return $this->success(['project' => $duplicate], 'Project duplicated successfully.');
+    }
+
+    public function getProjectTasks(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'project_id' => 'required|integer|exists:projects,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $user = auth()->user();
+        $project_id = $request->project_id;
+
+        $tasks = ProjectTask::where('project_id', $project_id)->get();
+
+        return $this->success(['tasks' => $tasks], 'Get Project Tasks successfully.');
+    }
+
+    public function createProjectTask(Request $request)
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'project_id' => 'required|integer|exists:projects,id',
+                'name' => 'required',
+                'estimated_hrs' => 'required',
+                'priority' => 'required',
+                'stage_id' => 'required',
+                'start_date' => 'required',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $usr = Auth::user();
+        $project_id = $request->project_id;
+        $project = Project::find($project_id);
+
+        $last_stage = \App\Models\TaskStage::where('created_by', \Auth::user()->creatorId())->orderBy('order', 'DESC')->first();
+        $last_stage = $last_stage ? $last_stage->id : 0;
+
+        $post = $request->all();
+        $post['project_id'] = $project->id;
+        $post['stage_id'] = $request->stage_id;
+        $post['assign_to'] = $request->assign_to;
+        $post['created_by'] = \Auth::user()->creatorId();
+        $post['start_date'] = date("Y-m-d H:i:s", strtotime($request->start_date));
+        $post['end_date'] = isset($request->end_date) ? date("Y-m-d H:i:s", strtotime($request->end_date)) : null;
+
+        if ($request->stage_id == $last_stage) {
+            $post['marked_at'] = date('Y-m-d');
+        }
+        $task = ProjectTask::create($post);
+
+        //Make entry in activity log
+        ActivityLog::create(
+            [
+                'user_id' => $usr->id,
+                'project_id' => $project_id,
+                'task_id' => $task->id,
+                'log_type' => 'Create Task',
+                'remark' => json_encode(['title' => $task->name]),
+            ]
+        );
+
+        //For Notification
+        $setting = Utility::settings(\Auth::user()->creatorId());
+
+        $users = explode(',', $task->assign_to);
+
+        if (isset($setting['new_task']) && $setting['new_task'] == 1) {
+            foreach ($users as $key => $user_id) {
+                $user = User::find($user_id);
+                if (!empty($user)) {
+                    $taskArr = [
+                        'task_user' => $user->name,
+                        'task_name' => $task->name,
+                        'project_name' => $project->project_name,
+                        'task_start_date' => $task->start_date,
+                        'task_end_date' => $task->end_date,
+                        'hours' => $task->estimated_hrs,
+                    ];
+                    // Utility::sendEmailTemplate might return something, we ignore it for API
+                    Utility::sendEmailTemplate('new_task', [$user->id => $user->email], $taskArr);
+                }
+            }
+        }
+
+        $taskNotificationArr = [
+            'task_name' => $task->name,
+            'project_name' => $project->project_name,
+            'user_name' => \Auth::user()->name,
+        ];
+        //Slack Notification
+        if (isset($setting['task_notification']) && $setting['task_notification'] == 1) {
+            Utility::send_slack_msg('new_task', $taskNotificationArr);
+        }
+        //Telegram Notification
+        if (isset($setting['telegram_task_notification']) && $setting['telegram_task_notification'] == 1) {
+            Utility::send_telegram_msg('new_task', $taskNotificationArr);
+        }
+
+        //For Google Calendar
+        if ($request->get('synchronize_type') == 'google_calender') {
+            $type = 'task';
+            $request1 = new ProjectTask();
+            $request1->title = $request->name;
+            $request1->start_date = $request->start_date;
+            $request1->end_date = $request->end_date;
+            Utility::addCalendarData($request1, $type);
+        }
+
+        //webhook
+        $module = 'New Task';
+        $webhook = Utility::webhookSetting($module);
+        if ($webhook) {
+            $parameter = json_encode($task);
+            $status = Utility::WebhookCall($webhook['url'], $parameter, $webhook['method']);
+        }
+
+        return $this->success(['task' => $task], 'Task added successfully.');
+    }
+
+    public function getProjectTask(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'task_id' => 'required|integer|exists:project_tasks,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $task = ProjectTask::find($request->task_id);
+
+        return $this->success(['task' => $task], 'Get Project Task successfully.');
+    }
+
+    public function updateProjectTask(Request $request)
+    {
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'task_id' => 'required|integer|exists:project_tasks,id',
+                'name' => 'required',
+                'estimated_hrs' => 'required',
+                'priority' => 'required',
+                'stage_id' => 'required',
+            ]
+        );
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        $task = ProjectTask::find($request->task_id);
+        $post = $request->all();
+
+        if ($request->has('stage_id') && $task->stage_id != $request->stage_id) {
+            $last_stage = \App\Models\TaskStage::where('created_by', \Auth::user()->creatorId())->orderBy('order', 'DESC')->first();
+            if ($last_stage && $request->stage_id == $last_stage->id) {
+                $post['is_complete'] = 1;
+                $post['marked_at'] = date('Y-m-d');
+            } else {
+                $post['is_complete'] = 0;
+                $post['marked_at'] = null;
+            }
+        }
+
+        $post['start_date'] = date("Y-m-d H:i:s", strtotime($request->start_date));
+        $post['end_date'] = isset($request->end_date) ? date("Y-m-d H:i:s", strtotime($request->end_date)) : null;
+
+        $task->update($post);
+
+        return $this->success(['task' => $task], 'Task Updated successfully.');
+    }
+
+    // ============================================
+    // Document Types
+    // ============================================
+
+    public function getDocuments(Request $request)
+    {
+        $documents = Document::where('created_by', Auth::user()->creatorId())->get()->map(function ($doc) {
+            return [
+                'id'          => $doc->id,
+                'name'        => $doc->name,
+                'is_required' => (bool) $doc->is_required,
+            ];
+        });
+
+        return $this->success(['document_types' => $documents], 'Document types retrieved.');
+    }
+
+    public function getDocument($id)
+    {
+        $document = Document::where('id', $id)->where('created_by', Auth::user()->creatorId())->first();
+        if (!$document) {
+            return $this->error('Document type not found.', 404);
+        }
+
+        return $this->success([
+            'document_type' => [
+                'id'          => $document->id,
+                'name'        => $document->name,
+                'is_required' => (bool) $document->is_required,
+            ]
+        ], 'Document type retrieved.');
+    }
+
+    public function deleteProjectTask(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'task_id' => 'required|integer|exists:project_tasks,id',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->error($validator->errors()->first(), 401);
+        }
+
+        ProjectTask::deleteTask([$request->task_id]);
+
+        return $this->success([], 'Task Deleted successfully.');
+    }
+}

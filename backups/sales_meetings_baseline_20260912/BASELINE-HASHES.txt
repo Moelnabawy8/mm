@@ -1,0 +1,8 @@
+186d5da9fa004486  app/Http/Controllers/SalesMeetingController.php
+052187a6d398f87f  app/Models/SalesMeeting.php
+72aa0d533e9e04ea  resources/views/sales_meetings/create.blade.php
+ba3afdb9cd66575d  resources/views/sales_meetings/edit.blade.php
+e133b2de9f008a6e  resources/views/sales_meetings/index.blade.php
+48230075de18e786  resources/views/sales_meetings/show.blade.php
+72b3c38a529a31ff  resources/views/sales_meetings/_table.blade.php
+e2b0a8fbe680ef6a  routes/web.php

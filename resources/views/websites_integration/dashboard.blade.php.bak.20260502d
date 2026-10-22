@@ -1,0 +1,145 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites Dashboard') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Websites') }}</li>
+    <li class="breadcrumb-item">{{ __('Overview') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-success d-flex align-items-center" role="alert">
+                <i class="ti ti-check me-2 fs-4"></i>
+                <div>
+                    <strong>{{ __('Live Data') }}.</strong>
+                    {{ __('Connected to my-communication.com (Arabic) — WordPress + WooCommerce + LearnPress.') }}
+                    <small class="text-muted ms-2">
+                        {{ __('Last sync') }}: {{ \Carbon\Carbon::parse($kpis['fetched_at'])->diffForHumans() }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- KPI cards row --}}
+    <div class="row">
+        @php
+            $cards = [
+                ['label' => __('Customers'),         'value' => number_format($kpis['users'] ?? 0),      'icon' => 'users',         'color' => 'primary'],
+                ['label' => __('Total Orders'),      'value' => number_format(($kpis['orders']['total'] ?? 0)),      'icon' => 'shopping-cart', 'color' => 'success'],
+                ['label' => __('Active Courses'),    'value' => number_format($kpis['courses'] ?? 0),    'icon' => 'school',        'color' => 'warning'],
+                ['label' => __('Products'),          'value' => number_format($kpis['products'] ?? 0),   'icon' => 'package',       'color' => 'info'],
+            ];
+        @endphp
+        @foreach ($cards as $k)
+            <div class="col-xl-3 col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="text-muted mb-1">{{ $k['label'] }}</p>
+                                <h3 class="mb-0">{{ $k['value'] }}</h3>
+                            </div>
+                            <span class="avtar avtar-l bg-light-{{ $k['color'] }}">
+                                <i class="ti ti-{{ $k['icon'] }} fs-3"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
+
+    {{-- Order status breakdown --}}
+    <div class="row">
+        <div class="col-xl-8">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">{{ __('Orders by Status') }}</h5></div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        @php
+                            $statusColors = [
+                                'pending'    => ['warning', 'clock'],
+                                'processing' => ['info',    'progress'],
+                                'completed'  => ['success', 'check'],
+                                'refunded'   => ['danger',  'refresh-alert'],
+                            ];
+                        @endphp
+                        @foreach ($statusColors as $status => [$color, $icon])
+                            <div class="col-md-3 col-6 mb-3">
+                                <div class="border rounded p-3">
+                                    <i class="ti ti-{{ $icon }} fs-2 text-{{ $color }} d-block mb-2"></i>
+                                    <h4 class="mb-0">{{ number_format($kpis['orders'][$status] ?? 0) }}</h4>
+                                    <p class="text-muted small mb-0 text-capitalize">{{ __(ucfirst($status)) }}</p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card h-100">
+                <div class="card-header"><h5 class="mb-0">{{ __('Site Status') }}</h5></div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="d-flex justify-content-between border-bottom py-2">
+                            <span><i class="ti ti-world me-2"></i>my-communication.com</span>
+                            <span class="badge bg-success">{{ __('Connected') }}</span>
+                        </li>
+                        <li class="d-flex justify-content-between border-bottom py-2">
+                            <span><i class="ti ti-brand-wordpress me-2"></i>WordPress REST</span>
+                            <span class="badge bg-light-success">{{ __('Active') }}</span>
+                        </li>
+                        <li class="d-flex justify-content-between border-bottom py-2">
+                            <span><i class="ti ti-shopping-cart me-2"></i>WooCommerce</span>
+                            <span class="badge bg-light-success">{{ __('Active') }}</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-2">
+                            <span><i class="ti ti-school me-2"></i>LearnPress</span>
+                            <span class="badge bg-light-success">{{ __('Active') }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Quick links --}}
+    <div class="row">
+        <div class="col-12"><h5 class="mt-4 mb-3">{{ __('Modules') }}</h5></div>
+        @php
+            $modules = [
+                ['url' => 'websites.users',      'icon' => 'users',         'name' => __('Users'),      'desc' => __('WordPress users')],
+                ['url' => 'websites.orders',     'icon' => 'shopping-cart', 'name' => __('Orders'),     'desc' => __('WooCommerce orders')],
+                ['url' => 'websites.courses',    'icon' => 'school',        'name' => __('Courses'),    'desc' => __('LearnPress courses')],
+                ['url' => 'websites.blogs',      'icon' => 'article',       'name' => __('Blogs'),      'desc' => __('Posts & categories')],
+                ['url' => 'websites.seo',        'icon' => 'chart-bar',     'name' => __('SEO'),        'desc' => __('Search Console')],
+                ['url' => 'websites.tracking',   'icon' => 'activity',      'name' => __('Tracking'),   'desc' => __('Live analytics')],
+                ['url' => 'websites.subdomains', 'icon' => 'link',          'name' => __('Subdomains'), 'desc' => __('Career & hiring')],
+                ['url' => 'websites.comments',   'icon' => 'message-2',     'name' => __('Comments'),   'desc' => __('Soon')],
+            ];
+        @endphp
+        @foreach ($modules as $m)
+            <div class="col-xl-3 col-md-4 col-sm-6">
+                <a href="{{ route($m['url']) }}" class="text-decoration-none">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="avtar avtar-s bg-light-primary me-2"><i class="ti ti-{{ $m['icon'] }}"></i></span>
+                                <h6 class="mb-0">{{ $m['name'] }}</h6>
+                            </div>
+                            <p class="text-muted mb-0 small">{{ $m['desc'] }}</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        @endforeach
+    </div>
+@endsection

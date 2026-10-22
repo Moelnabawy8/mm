@@ -1,0 +1,12 @@
+{
+    "name": "Guide",
+    "alias": "guide",
+    "description": "Complete ERP System Guide with Video Tutorials and Documentation",
+    "keywords": ["guide", "documentation", "tutorials", "videos", "help"],
+    "priority": 0,
+    "providers": [
+        "Modules\\Guide\\Providers\\GuideServiceProvider",
+        "Modules\\Guide\\Providers\\AddMenuProvider"
+    ],
+    "files": []
+}

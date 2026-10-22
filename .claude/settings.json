@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/xampp/php/php.exe -l views/seo/layout.php)",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root myco_uk -e \"SELECT route, CHAR_LENGTH\\(meta_keywords\\) AS kw_len, LEFT\\(meta_keywords, 300\\) AS kw_preview FROM seo_fields;\")",
+      "Bash(\"/c/xampp/mysql/bin/mysqld.exe\" --defaults-file=/c/xampp/mysql/bin/my.ini --console)",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root myco_uk -e \"SELECT route, CHAR_LENGTH\\(meta_keywords\\) AS kw_len, LEFT\\(meta_keywords, 400\\) AS kw_preview FROM seo_fields\\\\G\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root myco_uk --raw -e \"SELECT meta_keywords FROM seo_fields WHERE route='home'\\\\G\")",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) Chrome/120.0\" \"https://my-communication.uk/\" -o u.html)",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(compatible; Googlebot/2.1; +http://www.google.com/bot.html\\)\" \"https://my-communication.uk/\" -o b.html)",
+      "Bash(sed -e 's/<script[^>]*>.*<\\\\/script>//g' -e 's/<style[^>]*>.*<\\\\/style>//g' -e 's/<[^>]*>/ /g' b.html)",
+      "Bash(perl -0777 -pe 's/<style.*?<\\\\/style>//gs; s/<script.*?<\\\\/script>//gs' b.html)",
+      "Bash(perl -0777 -ne 'print $1 if m{<body>\\(.*?\\)</body>}s')",
+      "Bash(perl -0777 -ne 'print $1 if m{<body>\\(.*?\\)</body>}s' u.html)",
+      "Bash(curl -s -A \"Mozilla/5.0 Chrome/120.0\" \"https://my-communication.uk/\")",
+      "Bash(curl -s -A \"Mozilla/5.0 \\(compatible; Googlebot/2.1; +http://www.google.com/bot.html\\)\" \"https://my-communication.uk/\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root myco_uk -e \"SHOW COLUMNS FROM seo_fields;\")",
+      "Bash(\"C:/xampp/mysql/bin/mysql.exe\" -u root myco_uk -e \"SELECT TABLE_NAME, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA='myco_uk' AND TABLE_NAME='seo_fields';\")",
+      "Bash(/c/xampp/php/php.exe -l api/application/views/seo/layout.php)"
+    ]
+  }
+}

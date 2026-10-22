@@ -1,0 +1,153 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites Dashboard') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Websites') }}</li>
+    <li class="breadcrumb-item">{{ __('Overview') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info d-flex align-items-center" role="alert">
+                <i class="ti ti-info-circle me-2 fs-4"></i>
+                <div>
+                    <strong>{{ __('Phase 1 — View Only') }}.</strong>
+                    {{ __('This is a placeholder dashboard. APIs are not connected yet. Layout and navigation are being validated.') }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- KPI cards row --}}
+    <div class="row">
+        @php
+            $kpis = [
+                ['label' => __('Total Users'),       'value' => '—', 'icon' => 'users',         'color' => 'primary'],
+                ['label' => __('Orders Today'),      'value' => '—', 'icon' => 'shopping-cart', 'color' => 'success'],
+                ['label' => __('Active Courses'),    'value' => '—', 'icon' => 'school',        'color' => 'warning'],
+                ['label' => __('Published Posts'),   'value' => '—', 'icon' => 'article',       'color' => 'info'],
+            ];
+        @endphp
+        @foreach ($kpis as $k)
+            <div class="col-xl-3 col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <p class="text-muted mb-1">{{ $k['label'] }}</p>
+                                <h3 class="mb-0">{{ $k['value'] }}</h3>
+                            </div>
+                            <span class="avtar avtar-l bg-light-{{ $k['color'] }}">
+                                <i class="ti ti-{{ $k['icon'] }} fs-3"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+    </div>
+
+    {{-- Per-site overview --}}
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ __('Sites Overview') }}</h5>
+                    <span class="badge bg-light-secondary">{{ __('Awaiting API connection') }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('Site') }}</th>
+                                    <th>{{ __('URL') }}</th>
+                                    <th>{{ __('Users') }}</th>
+                                    <th>{{ __('Orders') }}</th>
+                                    <th>{{ __('Courses') }}</th>
+                                    <th>{{ __('Posts') }}</th>
+                                    <th>{{ __('Status') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>my-communication.com</strong></td>
+                                    <td><a href="https://my-communication.com" target="_blank" rel="noopener">my-communication.com</a></td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td><span class="badge bg-light-warning">{{ __('Not connected') }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ __('Careers') }}</strong></td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td><span class="badge bg-light-warning">{{ __('Not connected') }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ __('Career Path') }}</strong></td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td><span class="badge bg-light-warning">{{ __('Not connected') }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>{{ __('Hiring') }}</strong></td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td>—</td>
+                                    <td><span class="badge bg-light-warning">{{ __('Not connected') }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Quick links to module pages --}}
+    <div class="row">
+        <div class="col-12"><h5 class="mt-4 mb-3">{{ __('Modules') }}</h5></div>
+        @php
+            $modules = [
+                ['url' => 'websites.users',      'icon' => 'users',         'name' => __('Users'),      'desc' => __('Manage WordPress users across sites')],
+                ['url' => 'websites.orders',     'icon' => 'shopping-cart', 'name' => __('Orders'),     'desc' => __('WooCommerce orders aggregated')],
+                ['url' => 'websites.courses',    'icon' => 'school',        'name' => __('Courses'),    'desc' => __('LearnPress courses & enrollments')],
+                ['url' => 'websites.blogs',      'icon' => 'article',       'name' => __('Blogs'),      'desc' => __('Posts, categories, tags')],
+                ['url' => 'websites.seo',        'icon' => 'chart-bar',     'name' => __('SEO'),        'desc' => __('Google Search Console insights')],
+                ['url' => 'websites.tracking',   'icon' => 'activity',      'name' => __('Tracking'),   'desc' => __('Live users & analytics')],
+                ['url' => 'websites.subdomains', 'icon' => 'link',          'name' => __('Subdomains'), 'desc' => __('Career, hiring & path subdomains')],
+                ['url' => 'websites.comments',   'icon' => 'message-2',     'name' => __('Comments'),   'desc' => __('Soon — comment moderation')],
+            ];
+        @endphp
+        @foreach ($modules as $m)
+            <div class="col-xl-3 col-md-4 col-sm-6">
+                <a href="{{ route($m['url']) }}" class="text-decoration-none">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="avtar avtar-s bg-light-primary me-2"><i class="ti ti-{{ $m['icon'] }}"></i></span>
+                                <h6 class="mb-0">{{ $m['name'] }}</h6>
+                            </div>
+                            <p class="text-muted mb-0 small">{{ $m['desc'] }}</p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        @endforeach
+    </div>
+@endsection

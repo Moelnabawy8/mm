@@ -1,0 +1,55 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites — Blogs') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('websites.dashboard') }}">{{ __('Websites') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Blogs') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info"><i class="ti ti-info-circle me-1"></i> {{ __('Placeholder — Blog posts will be loaded here once the WordPress REST API is connected.') }}</div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ __('Posts') }}</h5>
+                    <ul class="nav nav-pills nav-sm" role="tablist">
+                        <li class="nav-item"><a class="nav-link active" href="#">{{ __('All Posts') }}</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#">{{ __('Categories') }}</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#">{{ __('Tags') }}</a></li>
+                    </ul>
+                </div>
+                <div class="card-body table-border-style">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('Title') }}</th>
+                                    <th>{{ __('Site') }}</th>
+                                    <th>{{ __('Author') }}</th>
+                                    <th>{{ __('Categories') }}</th>
+                                    <th>{{ __('Comments') }}</th>
+                                    <th>{{ __('Views') }}</th>
+                                    <th>{{ __('Published') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td colspan="7" class="text-center text-muted py-5">
+                                    <i class="ti ti-article-off fs-1 d-block mb-2 opacity-50"></i>
+                                    {{ __('No posts yet. Connect the WordPress REST API to populate.') }}
+                                </td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection

@@ -1,0 +1,30 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Block direct access to sensitive files and directories
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+    RewriteRule ^\.env - [F,L]
+    RewriteRule ^composer\.(json|lock)$ - [F,L]
+    RewriteRule ^artisan$ - [F,L]
+
+    # If the request is for something inside public/, let it through
+    RewriteRule ^public/ - [L]
+
+    # If a real file or directory exists, serve it
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Route everything else through public/index.php
+    RewriteRule ^(.*)$ public/index.php [L,QSA]
+</IfModule>
+
+# LiteSpeed-specific: ensure PHP handler is active
+<IfModule mod_suexec.c>
+    <Files index.php>
+        SetHandler application/x-httpd-lsphp
+    </Files>
+</IfModule>
+
+# Disable directory listing
+Options -Indexes

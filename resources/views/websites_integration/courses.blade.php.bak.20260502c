@@ -1,0 +1,68 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites — Courses') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('websites.dashboard') }}">{{ __('Websites') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Courses') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info"><i class="ti ti-school me-1"></i>
+                {{ __('LearnPress catalog from') }} <strong>my-communication.com</strong> · <strong>{{ number_format($total) }}</strong> {{ __('total courses') }}
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">{{ __('Courses Catalog') }}</h5></div>
+                <div class="card-body table-border-style">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>{{ __('Course Title') }}</th>
+                                    <th>{{ __('Instructor') }}</th>
+                                    <th>{{ __('Duration') }}</th>
+                                    <th>{{ __('Students') }}</th>
+                                    <th>{{ __('Price') }}</th>
+                                    <th>{{ __('Action') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($courses as $c)
+                                    <tr>
+                                        <td>{{ $c['id'] }}</td>
+                                        <td><strong>{{ $c['name'] }}</strong></td>
+                                        <td>{{ $c['instructor'] }}</td>
+                                        <td><small>{{ $c['duration'] ?: '—' }}</small></td>
+                                        <td><span class="badge bg-light-primary">{{ number_format($c['students_count']) }}</span></td>
+                                        <td><strong>{{ $c['price'] ?: __('Free') }}</strong></td>
+                                        <td>
+                                            @if (!empty($c['permalink']))
+                                                <a href="{{ $c['permalink'] }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                                                    <i class="ti ti-external-link"></i>
+                                                </a>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="text-center text-muted py-5">
+                                        <i class="ti ti-book-off fs-1 d-block mb-2 opacity-50"></i>
+                                        {{ __('No courses found or API unreachable.') }}
+                                    </td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection

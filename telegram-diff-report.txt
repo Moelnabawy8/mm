@@ -1,0 +1,300 @@
+Telegram patch vs server-copy — Mon Sep 28 04:45:14 EDT 2026
+
+routes/web.php   +15  -0
+routes/console.php   +14  -0
+app/Observers/ProjectTaskObserver.php   +87  -0
+app/Observers/TaskCommentObserver.php   +55  -0
+resources/views/settings/company.blade.php   +11  -0
+resources/views/partials/admin/menu.blade.php   +14  -0
+
+--- server/routes/web.php
++++ patched/routes/web.php
+@@ -538,6 +538,21 @@
+             Route::get('whatsapp/log', [\App\Http\Controllers\WhatsAppController::class, 'log'])->name('whatsapp.log');
+             Route::post('whatsapp/log/{id}/resend', [\App\Http\Controllers\WhatsAppController::class, 'resend'])->name('whatsapp.log.resend');
+             Route::get('whatsapp/task/{taskId}', [\App\Http\Controllers\WhatsAppController::class, 'taskTab'])->name('whatsapp.task.tab');
++            // Telegram task notifications (Bot API, long-polling). No webhook anywhere:
++            // linking + delivery both run inside `telegram:dispatch` via getUpdates, so
++            // no public endpoint and no CSRF exception is needed — ever.
++            // NOTE: `telegram-settings` / `telegram.settings` already belong to the OLD
++            // SystemController@saveTelegramSettings — hence telegram/task-settings here.
++            Route::post('telegram/task-settings', [\App\Http\Controllers\TelegramController::class, 'saveSettings'])->name('telegram.task.settings');
++            Route::post('telegram/connection', [\App\Http\Controllers\TelegramController::class, 'connection'])->name('telegram.connection');
++            Route::get('telegram/link', [\App\Http\Controllers\TelegramController::class, 'link'])->name('telegram.link');
++            Route::post('telegram/link/regenerate', [\App\Http\Controllers\TelegramController::class, 'regenerateLink'])->name('telegram.link.regenerate');
++            Route::post('telegram/link/unlink', [\App\Http\Controllers\TelegramController::class, 'unlinkOwn'])->name('telegram.link.unlink');
++            Route::get('telegram/recipients', [\App\Http\Controllers\TelegramController::class, 'recipients'])->name('telegram.recipients');
++            Route::post('telegram/recipients/{id}/unlink', [\App\Http\Controllers\TelegramController::class, 'unlinkRecipient'])->name('telegram.recipients.unlink');
++            Route::post('telegram/recipients/{id}/test', [\App\Http\Controllers\TelegramController::class, 'testSend'])->name('telegram.recipients.test');
++            Route::get('telegram/log', [\App\Http\Controllers\TelegramController::class, 'log'])->name('telegram.log');
++            Route::post('telegram/log/{id}/resend', [\App\Http\Controllers\TelegramController::class, 'resend'])->name('telegram.log.resend');
+ 
+             Route::get('print-setting', [SystemController::class, 'printIndex'])->name('print.setting');
+             Route::get('settings', [SystemController::class, 'companyIndex'])->name('settings')->middleware(['XSS']);
+
+--- server/routes/console.php
++++ patched/routes/console.php
+@@ -35,3 +35,17 @@
+ }
+ 
+ Schedule::command('academy:sync-cancellations')->dailyAt('03:10')->withoutOverlapping();
++
++// Telegram task notifications ────────────────────────────────────
++// Long-polling dispatcher: links chats via getUpdates (/start tokens) and drains
++// the telegram_messages outbox. Every minute; the command itself bows out after
++// ~50s (max-runtime) so ticks never overlap. Registered here — NOT in
++// app/Console/Kernel.php, which is dead code on Laravel 11 (never loaded, so
++// anything scheduled there silently dies). Verify with `php artisan schedule:list`.
++//
++// REQUIRES `php artisan schedule:run` every minute in the site user's crontab
++// (crontab -u erpmy5243 -l).
++Schedule::command('telegram:dispatch')->everyMinute()->withoutOverlapping();
++
++// Due-date reminders for Telegram (today/tomorrow only — never overdue tasks).
++Schedule::command('telegram:task-reminders')->dailyAt('08:00')->withoutOverlapping();
+
+--- server/app/Observers/ProjectTaskObserver.php
++++ patched/app/Observers/ProjectTaskObserver.php
+@@ -4,6 +4,9 @@
+ 
+ use App\Models\ProjectTask;
+ use App\Models\User;
++use App\Support\Telegram\TelegramConfig;
++use App\Support\Telegram\TelegramGate;
++use App\Support\Telegram\TelegramNotifier;
+ use App\Support\WhatsApp\TaskNotifier;
+ use App\Support\WhatsApp\WhatsAppConfig;
+ use App\Support\WhatsApp\WhatsAppGate;
+@@ -27,6 +30,8 @@
+ {
+     public function created(ProjectTask $task): void
+     {
++        $this->telegramCreated($task);
++
+         if (WhatsAppGate::suppressed() || !WhatsAppConfig::enabled()) {
+             return;
+         }
+@@ -45,6 +50,8 @@
+ 
+     public function updated(ProjectTask $task): void
+     {
++        $this->telegramUpdated($task);
++
+         if (WhatsAppGate::suppressed() || !WhatsAppConfig::enabled()) {
+             return;
+         }
+@@ -102,4 +109,84 @@
+     {
+         return Auth::check() ? Auth::user() : null;
+     }
++
++    // ── Telegram task notifications ─────────────────────────────────────────────
++    // Independent channel with its own config. Called as the FIRST statement of the
++    // WhatsApp hooks so their early returns can never skip it, and wrapped so a
++    // Telegram failure can never break the save or the WhatsApp path. Same HARD RULE
++    // as the class docblock: only ever inserts into `telegram_messages`.
++    //
++    // Also honours WhatsApp's suppression scope: the project-duplication actions
++    // (ProjectController@duplicate, ApiController@duplicateProject) only call
++    // WhatsAppGate::suppressForRequest(), and a request that silenced WhatsApp for a
++    // bulk clone is a bulk clone for Telegram too.
++    private static function telegramSuppressed(): bool
++    {
++        return TelegramGate::suppressed() || WhatsAppGate::suppressed() || !TelegramConfig::enabled();
++    }
++
++    private function telegramCreated(ProjectTask $task): void
++    {
++        try {
++            if (self::telegramSuppressed() || !TelegramConfig::eventEnabled('assign')) {
++                return;
++            }
++
++            $ids = TelegramNotifier::ids($task->assign_to);
++            if ($ids) {
++                TelegramGate::count(count($ids));
++                app(TelegramNotifier::class)->assigned($task, $ids, $this->actor());
++            }
++        } catch (\Throwable $e) {
++            report($e);
++        }
++    }
++
++    private function telegramUpdated(ProjectTask $task): void
++    {
++        try {
++            if (self::telegramSuppressed()) {
++                return;
++            }
++
++            $changed = array_keys($task->getChanges());
++            if (!array_intersect($changed, ['assign_to', 'stage_id'])) {
++                return;
++            }
++
++            $actor = $this->actor();
++
++            if (in_array('assign_to', $changed, true) && TelegramConfig::eventEnabled('assign')) {
++                $old   = TelegramNotifier::ids($task->getOriginal('assign_to'));
++                $new   = TelegramNotifier::ids($task->assign_to);
++                $added = array_values(array_diff($new, $old)); // only newly added people
++
++                if ($added) {
++                    TelegramGate::count(count($added));
++                    app(TelegramNotifier::class)->assigned($task, $added, $actor);
++                }
++            }
++
++            if (in_array('stage_id', $changed, true) && TelegramConfig::eventEnabled('stage')) {
++                // Don't tell people about something they just did themselves.
++                $recipients = array_values(array_diff(
++                    TelegramNotifier::ids($task->assign_to),
++                    array_filter([$actor?->id])
++                ));
++
++                if ($recipients) {
++                    TelegramGate::count(count($recipients));
++                    app(TelegramNotifier::class)->stageChanged(
++                        $task,
++                        $recipients,
++                        $task->getOriginal('stage_id') ? (int) $task->getOriginal('stage_id') : null,
++                        $task->stage_id ? (int) $task->stage_id : null,
++                        $actor
++                    );
++                }
++            }
++        } catch (\Throwable $e) {
++            report($e);
++        }
++    }
+ }
+
+--- server/app/Observers/TaskCommentObserver.php
++++ patched/app/Observers/TaskCommentObserver.php
+@@ -5,6 +5,9 @@
+ use App\Models\ProjectTask;
+ use App\Models\TaskComment;
+ use App\Models\User;
++use App\Support\Telegram\TelegramConfig;
++use App\Support\Telegram\TelegramGate;
++use App\Support\Telegram\TelegramNotifier;
+ use App\Support\WhatsApp\TaskNotifier;
+ use App\Support\WhatsApp\WhatsAppConfig;
+ use App\Support\WhatsApp\WhatsAppGate;
+@@ -23,6 +26,8 @@
+ {
+     public function created(TaskComment $comment): void
+     {
++        $this->telegramCommented($comment);
++
+         if (WhatsAppGate::suppressed() || !WhatsAppConfig::enabled()) {
+             return;
+         }
+@@ -64,4 +69,54 @@
+ 
+         return $id ? User::find($id) : null;
+     }
++
++    // ── Telegram task notifications ─────────────────────────────────────────────
++    // Independent channel with its own config. Called as the FIRST statement of the
++    // WhatsApp hooks so their early returns can never skip it, and wrapped so a
++    // Telegram failure can never break the save or the WhatsApp path. Same HARD RULE
++    // as the class docblock: only ever inserts into `telegram_messages`.
++    //
++    // Also honours WhatsApp's suppression scope: the project-duplication actions
++    // (ProjectController@duplicate, ApiController@duplicateProject) only call
++    // WhatsAppGate::suppressForRequest(), and a request that silenced WhatsApp for a
++    // bulk clone is a bulk clone for Telegram too.
++    private static function telegramSuppressed(): bool
++    {
++        return TelegramGate::suppressed() || WhatsAppGate::suppressed() || !TelegramConfig::enabled();
++    }
++
++    private function telegramCommented(TaskComment $comment): void
++    {
++        try {
++            if (self::telegramSuppressed() || !TelegramConfig::eventEnabled('comment')) {
++                return;
++            }
++
++            $task = ProjectTask::find($comment->task_id);
++            if (!$task) {
++                return;
++            }
++
++            $actor = Auth::check() ? Auth::user() : $this->authorFrom($comment);
++
++            $recipients = array_values(array_diff(
++                TelegramNotifier::ids($task->assign_to),
++                array_filter([$actor?->id])
++            ));
++
++            if ($recipients) {
++                TelegramGate::count(count($recipients));
++
++                app(TelegramNotifier::class)->commented(
++                    $task,
++                    $recipients,
++                    (int) $comment->id,
++                    (string) $comment->comment,
++                    $actor
++                );
++            }
++        } catch (\Throwable $e) {
++            report($e);
++        }
++    }
+ }
+
+--- server/resources/views/settings/company.blade.php
++++ patched/resources/views/settings/company.blade.php
+@@ -433,6 +433,12 @@
+                                     <div class="float-end"><i class="ti ti-chevron-right"></i></div>
+                                 </a>
+                             @endcan
++                            @can('manage telegram notification')
++                                <a href="#telegram-task-settings"
++                                    class="list-group-item list-group-item-action border-0">{{ __('Telegram Task Notifications') }}
++                                    <div class="float-end"><i class="ti ti-chevron-right"></i></div>
++                                </a>
++                            @endcan
+                             <a href="#email-notification-settings"
+                                 class="list-group-item list-group-item-action border-0">{{ __('Email Notification Settings') }}
+                                 <div class="float-end"><i class="ti ti-chevron-right"></i></div>
+@@ -4876,6 +4882,11 @@
+                         @include('whatsapp.partials.settings')
+                     @endcan
+ 
++                    <!--Telegram Task Notifications-->
++                    @can('manage telegram notification')
++                        @include('telegram.partials.settings')
++                    @endcan
++
+                     <!--Email Notification Settings-->
+                     <div id="email-notification-settings" class="card">
+                         <div class="col-md-12">
+
+--- server/resources/views/partials/admin/menu.blade.php
++++ patched/resources/views/partials/admin/menu.blade.php
+@@ -2202,6 +2202,20 @@
+                                             class="dash-link">{{ __('WhatsApp Delivery Log') }}</a>
+                                     </li>
+                                 @endif
++                                @if (Route::has('telegram.link'))
++                                    <li
++                                        class="dash-item {{ Request::segment(1) == 'telegram' && Request::segment(2) == 'link' ? ' active' : '' }}">
++                                        <a href="{{ route('telegram.link') }}"
++                                            class="dash-link">{{ __('Link Telegram Account') }}</a>
++                                    </li>
++                                @endif
++                                @if (Gate::check('view telegram log') && Route::has('telegram.log'))
++                                    <li
++                                        class="dash-item {{ Request::segment(1) == 'telegram' && Request::segment(2) == 'log' ? ' active' : '' }}">
++                                        <a href="{{ route('telegram.log') }}"
++                                            class="dash-link">{{ __('Telegram Delivery Log') }}</a>
++                                    </li>
++                                @endif
+                                 @if (Gate::check('manage company plan'))
+                                     <li
+                                         class="dash-item{{ Request::route()->getName() == 'plans.index' || Request::route()->getName() == 'stripe' ? ' active' : '' }}">
+

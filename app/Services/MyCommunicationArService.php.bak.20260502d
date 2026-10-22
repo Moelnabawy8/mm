@@ -1,0 +1,338 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * MyCommunicationArService
+ *
+ * Server-side client for the Arabic site (my-communication.com).
+ * Wraps three sets of REST APIs:
+ *   1. WordPress core    — wp/v2/* (public read, no auth needed)
+ *   2. WooCommerce       — wc/v3/* (consumer key/secret from .env)
+ *   3. LearnPress        — lp/v1/*  (public read, no auth)
+ *
+ * Every method:
+ *   - Caches the result for 60s (configurable)
+ *   - Times out after 8s
+ *   - On failure: logs warning + returns safe empty/default value
+ *   - NEVER throws — controllers using this never crash the page.
+ */
+class MyCommunicationArService
+{
+    private const SITE_URL = 'https://my-communication.com';
+    private const CACHE_TTL = 60;
+    private const TIMEOUT = 8;
+
+    private function wpBase(): string  { return self::SITE_URL . '/wp-json/wp/v2'; }
+    private function wcBase(): string  { return self::SITE_URL . '/wp-json/wc/v3'; }
+    private function lpBase(): string  { return self::SITE_URL . '/wp-json/lp/v1'; }
+
+    private function wcAuth(): array
+    {
+        return [
+            'consumer_key'    => env('WOOCOMMERCE_AR_CONSUMER_KEY', ''),
+            'consumer_secret' => env('WOOCOMMERCE_AR_CONSUMER_SECRET', ''),
+        ];
+    }
+
+    public function isConfigured(): bool
+    {
+        return env('WOOCOMMERCE_AR_CONSUMER_KEY') && env('WOOCOMMERCE_AR_CONSUMER_SECRET');
+    }
+
+    // ================================================================
+    // WordPress core (public — no auth required for read)
+    // ================================================================
+
+    public function getPosts(int $perPage = 10): array
+    {
+        return Cache::remember("mc_ar_posts_{$perPage}", self::CACHE_TTL, function () use ($perPage) {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->wpBase() . '/posts', [
+                    'per_page' => $perPage,
+                    '_embed'   => 'author,wp:term,wp:featuredmedia',
+                    'orderby'  => 'date',
+                    'order'    => 'desc',
+                ]);
+                if (!$r->successful()) return [];
+                return array_map(fn($p) => $this->trimPost($p), $r->json() ?: []);
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getPosts failed', ['err' => $e->getMessage()]);
+                return [];
+            }
+        });
+    }
+
+    public function getCategories(int $perPage = 50): array
+    {
+        return Cache::remember("mc_ar_cats_{$perPage}", self::CACHE_TTL, function () use ($perPage) {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->wpBase() . '/categories', [
+                    'per_page' => $perPage,
+                    'orderby'  => 'count',
+                    'order'    => 'desc',
+                ]);
+                if (!$r->successful()) return [];
+                return array_map(fn($c) => [
+                    'id'    => $c['id'] ?? 0,
+                    'name'  => $c['name'] ?? '',
+                    'slug'  => $c['slug'] ?? '',
+                    'count' => $c['count'] ?? 0,
+                    'link'  => $c['link'] ?? '',
+                ], $r->json() ?: []);
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getCategories failed', ['err' => $e->getMessage()]);
+                return [];
+            }
+        });
+    }
+
+    /**
+     * Returns customers from WooCommerce (richer than WP /users which hides
+     * accounts without public posts). Requires WC auth keys.
+     */
+    public function getUsers(int $perPage = 20): array
+    {
+        if (!$this->isConfigured()) return [];
+        return Cache::remember("mc_ar_users_{$perPage}", self::CACHE_TTL, function () use ($perPage) {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->wcBase() . '/customers', array_merge($this->wcAuth(), [
+                    'per_page' => $perPage,
+                    'orderby'  => 'registered_date',
+                    'order'    => 'desc',
+                    'role'     => 'customer',
+                ]));
+                if (!$r->successful()) return [];
+                return array_map(fn($u) => [
+                    'id'             => $u['id'] ?? 0,
+                    'name'           => trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['username'] ?? ''),
+                    'slug'           => $u['username'] ?? '',
+                    'description'    => $u['email'] ?? '',
+                    'avatar'         => $u['avatar_url'] ?? '',
+                    'link'           => '',
+                    'date_created'   => $u['date_created'] ?? '',
+                    'orders_count'   => (int) ($u['orders_count'] ?? 0),
+                    'total_spent'    => (float) ($u['total_spent'] ?? 0),
+                    'is_paying'      => (bool) ($u['is_paying_customer'] ?? false),
+                ], $r->json() ?: []);
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getUsers failed', ['err' => $e->getMessage()]);
+                return [];
+            }
+        });
+    }
+
+    private function trimPost(array $p): array
+    {
+        $author = $p['_embedded']['author'][0] ?? null;
+        $cats = [];
+        $tags = [];
+        if (!empty($p['_embedded']['wp:term'])) {
+            foreach ($p['_embedded']['wp:term'] as $group) {
+                foreach ($group as $term) {
+                    if (($term['taxonomy'] ?? '') === 'category') {
+                        $cats[] = $term['name'] ?? '';
+                    } elseif (($term['taxonomy'] ?? '') === 'post_tag') {
+                        $tags[] = $term['name'] ?? '';
+                    }
+                }
+            }
+        }
+        $featured = $p['_embedded']['wp:featuredmedia'][0]['source_url'] ?? null;
+        return [
+            'id'         => $p['id'] ?? 0,
+            'title'      => strip_tags($p['title']['rendered'] ?? ''),
+            'slug'       => $p['slug'] ?? '',
+            'link'       => $p['link'] ?? '',
+            'date'       => $p['date'] ?? '',
+            'excerpt'    => trim(strip_tags($p['excerpt']['rendered'] ?? '')),
+            'author'     => $author['name'] ?? '—',
+            'categories' => $cats,
+            'tags'       => $tags,
+            'featured'   => $featured,
+            'comments'   => $p['comment_status'] === 'open' ? 1 : 0,
+        ];
+    }
+
+    // ================================================================
+    // WooCommerce (auth required)
+    // ================================================================
+
+    public function getOrders(int $perPage = 20): array
+    {
+        if (!$this->isConfigured()) return [];
+        return Cache::remember("mc_ar_orders_{$perPage}", self::CACHE_TTL, function () use ($perPage) {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->wcBase() . '/orders', array_merge($this->wcAuth(), [
+                    'per_page' => $perPage,
+                    'orderby'  => 'date',
+                    'order'    => 'desc',
+                ]));
+                if (!$r->successful()) return [];
+                return array_map(fn($o) => [
+                    'id'             => $o['id'] ?? 0,
+                    'number'         => $o['number'] ?? '',
+                    'status'         => $o['status'] ?? '',
+                    'currency'       => $o['currency'] ?? 'USD',
+                    'total'          => (float) ($o['total'] ?? 0),
+                    'date_created'   => $o['date_created'] ?? '',
+                    'customer_id'    => $o['customer_id'] ?? 0,
+                    'customer_name'  => trim(($o['billing']['first_name'] ?? '') . ' ' . ($o['billing']['last_name'] ?? '')),
+                    'customer_email' => $o['billing']['email'] ?? '',
+                    'items_count'    => is_array($o['line_items'] ?? null) ? count($o['line_items']) : 0,
+                    'payment_method' => $o['payment_method_title'] ?? '',
+                ], $r->json() ?: []);
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getOrders failed', ['err' => $e->getMessage()]);
+                return [];
+            }
+        });
+    }
+
+    /** Returns counts grouped by order status — derived from a single page (cheap). */
+    public function getOrderStats(): array
+    {
+        if (!$this->isConfigured()) {
+            return ['pending' => 0, 'processing' => 0, 'completed' => 0, 'refunded' => 0, 'total' => 0];
+        }
+        return Cache::remember('mc_ar_order_stats', self::CACHE_TTL, function () {
+            $stats = ['pending' => 0, 'processing' => 0, 'completed' => 0, 'refunded' => 0, 'total' => 0];
+            foreach (['pending', 'processing', 'completed', 'refunded'] as $status) {
+                try {
+                    $r = Http::timeout(self::TIMEOUT)->get($this->wcBase() . '/orders', array_merge($this->wcAuth(), [
+                        'status' => $status, 'per_page' => 1,
+                    ]));
+                    if ($r->successful()) {
+                        $stats[$status] = (int) ($r->header('X-WP-Total') ?: 0);
+                    }
+                } catch (\Throwable $e) { /* ignore single status failure */ }
+            }
+            $stats['total'] = array_sum($stats);
+            return $stats;
+        });
+    }
+
+    public function getCustomerCount(): int
+    {
+        if (!$this->isConfigured()) return 0;
+        return Cache::remember('mc_ar_customer_count', self::CACHE_TTL, function () {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->wcBase() . '/customers', array_merge($this->wcAuth(), [
+                    'per_page' => 1, 'role' => 'customer',
+                ]));
+                return $r->successful() ? (int) ($r->header('X-WP-Total') ?: 0) : 0;
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getCustomerCount failed', ['err' => $e->getMessage()]);
+                return 0;
+            }
+        });
+    }
+
+    public function getProductCount(): int
+    {
+        if (!$this->isConfigured()) return 0;
+        return Cache::remember('mc_ar_product_count', self::CACHE_TTL, function () {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->wcBase() . '/products', array_merge($this->wcAuth(), [
+                    'per_page' => 1,
+                ]));
+                return $r->successful() ? (int) ($r->header('X-WP-Total') ?: 0) : 0;
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getProductCount failed', ['err' => $e->getMessage()]);
+                return 0;
+            }
+        });
+    }
+
+    // ================================================================
+    // LearnPress (public — no auth required for read)
+    // ================================================================
+
+    /**
+     * LearnPress courses — wraps response in {status, data: {courses: [...]}}.
+     * Every value is HTML-wrapped on the wire; we strip tags to plain text and
+     * regex-extract image src from <img> markup.
+     */
+    public function getCourses(int $perPage = 100): array
+    {
+        return Cache::remember("mc_ar_courses_{$perPage}", self::CACHE_TTL, function () use ($perPage) {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->lpBase() . '/courses', [
+                    'per_page' => $perPage,
+                ]);
+                if (!$r->successful()) return [];
+                $body = $r->json();
+                $list = $body['data']['courses'] ?? [];
+                if (!is_array($list)) return [];
+                return array_map(fn($c) => $this->trimCourse($c), $list);
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getCourses failed', ['err' => $e->getMessage()]);
+                return [];
+            }
+        });
+    }
+
+    private function trimCourse(array $c): array
+    {
+        $image = '';
+        if (!empty($c['image']) && preg_match('/src=["\']([^"\']+)["\']/', $c['image'], $m)) {
+            $image = $m[1];
+        }
+        $permalink = '';
+        if (!empty($c['button']) || !empty($c['title'])) {
+            // LearnPress doesn't expose direct permalink in this endpoint;
+            // fall back to slug-based guess from title (we have site URL).
+            $permalink = self::SITE_URL . '/courses/?p=' . ($c['ID'] ?? '');
+        }
+        return [
+            'id'             => (int) ($c['ID'] ?? 0),
+            'name'           => trim(strip_tags($c['title'] ?? '')),
+            'description'    => trim(strip_tags($c['description'] ?? '')),
+            'price'          => trim(html_entity_decode(strip_tags($c['price'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+            'students_count' => (int) preg_replace('/\D/', '', strip_tags($c['student'] ?? '0')),
+            'lessons_count'  => (int) preg_replace('/\D/', '', strip_tags($c['lesson'] ?? '0')),
+            'quizzes_count'  => (int) preg_replace('/\D/', '', strip_tags($c['quiz'] ?? '0')),
+            'duration'       => trim(strip_tags($c['duration'] ?? '')),
+            'level'          => trim(strip_tags($c['level'] ?? '')),
+            'instructor'     => trim(strip_tags($c['instructor'] ?? '—')),
+            'categories'     => trim(strip_tags(str_replace(',', ', ', $c['category'] ?? ''))),
+            'image'          => $image,
+            'permalink'      => $permalink,
+        ];
+    }
+
+    public function getCourseCount(): int
+    {
+        return Cache::remember('mc_ar_course_count', self::CACHE_TTL, function () {
+            try {
+                $r = Http::timeout(self::TIMEOUT)->get($this->lpBase() . '/courses', ['per_page' => 100]);
+                if (!$r->successful()) return 0;
+                $body = $r->json();
+                $list = $body['data']['courses'] ?? [];
+                return is_array($list) ? count($list) : 0;
+            } catch (\Throwable $e) {
+                Log::warning('MC-AR getCourseCount failed', ['err' => $e->getMessage()]);
+                return 0;
+            }
+        });
+    }
+
+    // ================================================================
+    // Aggregate dashboard summary
+    // ================================================================
+
+    public function getDashboardKpis(): array
+    {
+        return [
+            'users'      => $this->getCustomerCount(),
+            'orders'     => $this->getOrderStats(),
+            'courses'    => $this->getCourseCount(),
+            'products'   => $this->getProductCount(),
+            'fetched_at' => now()->toIso8601String(),
+        ];
+    }
+}

@@ -1,0 +1,100 @@
+@extends('layouts.admin')
+
+@section('page-title')
+    {{ __('Websites — Orders') }}
+@endsection
+
+@section('breadcrumb')
+    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">{{ __('Dashboard') }}</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('websites.dashboard') }}">{{ __('Websites') }}</a></li>
+    <li class="breadcrumb-item">{{ __('Orders') }}</li>
+@endsection
+
+@section('content')
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info"><i class="ti ti-shopping-cart me-1"></i>
+                {{ __('Latest WooCommerce orders from') }} <strong>my-communication.com</strong>.
+            </div>
+        </div>
+
+        @php
+            $statusMeta = [
+                ['key' => 'pending',    'label' => __('Pending'),    'color' => 'warning'],
+                ['key' => 'processing', 'label' => __('Processing'), 'color' => 'info'],
+                ['key' => 'completed',  'label' => __('Completed'),  'color' => 'success'],
+                ['key' => 'refunded',   'label' => __('Refunded'),   'color' => 'danger'],
+            ];
+        @endphp
+        @foreach ($statusMeta as $s)
+            <div class="col-xl-3 col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <p class="text-muted mb-1">{{ $s['label'] }}</p>
+                        <h3 class="mb-0 text-{{ $s['color'] }}">{{ number_format($stats[$s['key']] ?? 0) }}</h3>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ __('Recent Orders') }}</h5>
+                    <span class="badge bg-light-success">{{ count($orders) }} {{ __('records') }}</span>
+                </div>
+                <div class="card-body table-border-style">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('Order #') }}</th>
+                                    <th>{{ __('Customer') }}</th>
+                                    <th>{{ __('Items') }}</th>
+                                    <th>{{ __('Total') }}</th>
+                                    <th>{{ __('Status') }}</th>
+                                    <th>{{ __('Payment') }}</th>
+                                    <th>{{ __('Date') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($orders as $o)
+                                    @php
+                                        $statusColor = [
+                                            'pending'    => 'warning',
+                                            'processing' => 'info',
+                                            'on-hold'    => 'secondary',
+                                            'completed'  => 'success',
+                                            'cancelled'  => 'danger',
+                                            'refunded'   => 'danger',
+                                            'failed'     => 'danger',
+                                        ][$o['status']] ?? 'secondary';
+                                    @endphp
+                                    <tr>
+                                        <td><strong>#{{ $o['number'] }}</strong></td>
+                                        <td>
+                                            {{ $o['customer_name'] ?: '(guest)' }}
+                                            @if (!empty($o['customer_email']))
+                                                <br><small class="text-muted">{{ $o['customer_email'] }}</small>
+                                            @endif
+                                        </td>
+                                        <td><span class="badge bg-light-secondary">{{ $o['items_count'] }}</span></td>
+                                        <td><strong>{{ number_format($o['total'], 2) }} {{ $o['currency'] }}</strong></td>
+                                        <td><span class="badge bg-light-{{ $statusColor }} text-capitalize">{{ $o['status'] }}</span></td>
+                                        <td><small>{{ $o['payment_method'] ?: '—' }}</small></td>
+                                        <td><small>{{ $o['date_created'] ? \Carbon\Carbon::parse($o['date_created'])->format('Y-m-d H:i') : '—' }}</small></td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="7" class="text-center text-muted py-5">
+                                        <i class="ti ti-shopping-cart-off fs-1 d-block mb-2 opacity-50"></i>
+                                        {{ __('No orders found or API unreachable.') }}
+                                    </td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endsection

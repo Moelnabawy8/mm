@@ -1,0 +1,1406 @@
+openapi: 3.0.3
+info:
+  title: n8n Integration Hub API
+  description: |
+    REST API for n8n workflow automation integration with ERP system.
+    
+    ## Authentication
+    All endpoints require Bearer token authentication.
+    
+    ```
+    Authorization: Bearer n8n_your_token_here
+    ```
+    
+    Or use X-API-Key header:
+    ```
+    X-API-Key: n8n_your_token_here
+    ```
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: http://erp.my-communication.uk/api/n8n
+    description: Production Server
+  - url: http://localhost:8000/api/n8n
+    description: Local Development
+
+tags:
+  - name: Health
+    description: API health check
+  - name: Users
+    description: User management
+  - name: Customers
+    description: Customer management
+  - name: Invoices
+    description: Invoice data (read-only)
+  - name: Products
+    description: Product and service management
+  - name: Leads
+    description: CRM lead management
+  - name: Projects
+    description: Project management
+  - name: Employees
+    description: Employee data (read-only)
+  - name: Webhook
+    description: Generic webhook receiver
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health Check
+      description: Check API status and client information
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: API is healthy
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: ok
+                      timestamp:
+                        type: string
+                        format: date-time
+                      client:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          abilities:
+                            type: array
+                            items:
+                              type: string
+                          rate_limit:
+                            type: integer
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List Users
+      description: Get all users with pagination
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or email
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [company, employee, client]
+          description: Filter by user type
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/User'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    
+    post:
+      tags:
+        - Users
+      summary: Create User
+      description: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get User
+      description: Get a specific user by ID
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    put:
+      tags:
+        - Users
+      summary: Update User
+      description: Update an existing user
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    
+    delete:
+      tags:
+        - Users
+      summary: Delete User
+      description: Delete a user
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /customers:
+    get:
+      tags:
+        - Customers
+      summary: List Customers
+      description: Get all customers with pagination
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name, email, or phone
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Customer'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+    
+    post:
+      tags:
+        - Customers
+      summary: Create Customer
+      description: Create a new customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerCreate'
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Customer'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /customers/{id}:
+    get:
+      tags:
+        - Customers
+      summary: Get Customer
+      description: Get a specific customer by ID
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CustomerDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    put:
+      tags:
+        - Customers
+      summary: Update Customer
+      description: Update an existing customer
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomerUpdate'
+      responses:
+        '200':
+          description: Customer updated
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    delete:
+      tags:
+        - Customers
+      summary: Delete Customer
+      description: Delete a customer
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Customer deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /invoices:
+    get:
+      tags:
+        - Invoices
+      summary: List Invoices
+      description: Get all invoices with filters
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: status
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1, 2, 3, 4]
+          description: "Status: 0=Draft, 1=Sent, 2=Unpaid, 3=Partial, 4=Paid"
+        - name: customer_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by customer
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: From issue date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: To issue date
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Invoice'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+
+  /invoices/{id}:
+    get:
+      tags:
+        - Invoices
+      summary: Get Invoice
+      description: Get invoice details with line items
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/InvoiceDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List Products
+      description: Get all products and services
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by name or SKU
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [product, service]
+          description: Filter by type
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by category
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+    
+    post:
+      tags:
+        - Products
+      summary: Create Product
+      description: Create a new product or service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Product'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /leads:
+    get:
+      tags:
+        - Leads
+      summary: List Leads
+      description: Get all CRM leads
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: pipeline_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by pipeline
+        - name: stage_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by stage
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by assigned user
+      responses:
+        '200':
+          description: List of leads
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Lead'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+    
+    post:
+      tags:
+        - Leads
+      summary: Create Lead
+      description: Create a new lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadCreate'
+      responses:
+        '201':
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Lead'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects:
+    get:
+      tags:
+        - Projects
+      summary: List Projects
+      description: Get all projects
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [not_started, in_progress, completed, on_hold]
+          description: Filter by status
+        - name: client_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by client
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Project'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+    
+    post:
+      tags:
+        - Projects
+      summary: Create Project
+      description: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Project'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /employees:
+    get:
+      tags:
+        - Employees
+      summary: List Employees
+      description: Get all employees
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: department_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by department
+        - name: branch_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by branch
+      responses:
+        '200':
+          description: List of employees
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Employee'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+
+  /employees/{id}:
+    get:
+      tags:
+        - Employees
+      summary: Get Employee
+      description: Get employee details
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Employee details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Employee'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /webhook:
+    post:
+      tags:
+        - Webhook
+      summary: Receive Webhook
+      description: Generic webhook endpoint to receive any JSON data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              example:
+                event: form_submission
+                source: website
+                data:
+                  name: John Doe
+                  email: john@example.com
+      responses:
+        '200':
+          description: Webhook received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Webhook received successfully
+                  data:
+                    type: object
+                    properties:
+                      received_at:
+                        type: string
+                        format: date-time
+                      payload_size:
+                        type: integer
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Format: Bearer n8n_xxxxxxxx"
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key authentication
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: Resource ID
+    
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+      description: Page number
+    
+    PerPageParam:
+      name: per_page
+      in: query
+      schema:
+        type: integer
+        default: 15
+        maximum: 100
+      description: Items per page
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Operation successful
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        type:
+          type: string
+          enum: [super admin, company, employee, client]
+        is_active:
+          type: integer
+        avatar:
+          type: string
+          nullable: true
+        last_login_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    UserCreate:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        password:
+          type: string
+          minLength: 8
+          example: SecurePass123!
+        type:
+          type: string
+          enum: [employee, client]
+          default: employee
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        is_active:
+          type: boolean
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        customer_id:
+          type: string
+          example: CUST-0001
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        contact:
+          type: string
+        billing_name:
+          type: string
+        billing_address:
+          type: string
+        billing_city:
+          type: string
+        billing_country:
+          type: string
+        balance:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+
+    CustomerDetail:
+      allOf:
+        - $ref: '#/components/schemas/Customer'
+        - type: object
+          properties:
+            billing_phone:
+              type: string
+            billing_state:
+              type: string
+            billing_zip:
+              type: string
+            shipping_name:
+              type: string
+            shipping_address:
+              type: string
+            shipping_city:
+              type: string
+            shipping_state:
+              type: string
+            shipping_country:
+              type: string
+            shipping_zip:
+              type: string
+            invoices_count:
+              type: integer
+            total_invoiced:
+              type: number
+              format: float
+
+    CustomerCreate:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: ACME Corporation
+        email:
+          type: string
+          format: email
+        contact:
+          type: string
+        billing_name:
+          type: string
+        billing_address:
+          type: string
+        billing_city:
+          type: string
+        billing_state:
+          type: string
+        billing_country:
+          type: string
+        billing_zip:
+          type: string
+        shipping_name:
+          type: string
+        shipping_address:
+          type: string
+        shipping_city:
+          type: string
+        shipping_state:
+          type: string
+        shipping_country:
+          type: string
+        shipping_zip:
+          type: string
+
+    CustomerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        contact:
+          type: string
+        billing_name:
+          type: string
+        billing_address:
+          type: string
+        billing_city:
+          type: string
+        billing_state:
+          type: string
+        billing_country:
+          type: string
+        billing_zip:
+          type: string
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: integer
+        invoice_id:
+          type: string
+          example: INV-0001
+        customer_id:
+          type: integer
+        customer_name:
+          type: string
+        issue_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        status:
+          type: integer
+          enum: [0, 1, 2, 3, 4]
+        status_label:
+          type: string
+          enum: [Draft, Sent, Unpaid, Partially Paid, Paid]
+        subtotal:
+          type: number
+          format: float
+        tax:
+          type: number
+          format: float
+        discount:
+          type: number
+          format: float
+        total:
+          type: number
+          format: float
+        due_amount:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+
+    InvoiceDetail:
+      allOf:
+        - $ref: '#/components/schemas/Invoice'
+        - type: object
+          properties:
+            customer:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                email:
+                  type: string
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceItem'
+            payments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Payment'
+            notes:
+              type: string
+
+    InvoiceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        product_name:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: number
+        price:
+          type: number
+          format: float
+        discount:
+          type: number
+          format: float
+        tax:
+          type: number
+          format: float
+        total:
+          type: number
+          format: float
+
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+          format: float
+        date:
+          type: string
+          format: date
+        payment_type:
+          type: string
+        reference:
+          type: string
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        sku:
+          type: string
+        type:
+          type: string
+          enum: [product, service]
+        sale_price:
+          type: number
+          format: float
+        purchase_price:
+          type: number
+          format: float
+        quantity:
+          type: integer
+          nullable: true
+        category:
+          type: string
+        unit:
+          type: string
+        tax_rate:
+          type: number
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ProductCreate:
+      type: object
+      required:
+        - name
+        - sale_price
+      properties:
+        name:
+          type: string
+          example: New Product
+        sku:
+          type: string
+          example: PRD-001
+        type:
+          type: string
+          enum: [product, service]
+          default: product
+        sale_price:
+          type: number
+          format: float
+          example: 99.99
+        purchase_price:
+          type: number
+          format: float
+        quantity:
+          type: integer
+        category_id:
+          type: integer
+        unit_id:
+          type: integer
+        tax_id:
+          type: integer
+        description:
+          type: string
+
+    Lead:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        subject:
+          type: string
+        pipeline:
+          type: string
+        stage:
+          type: string
+        assigned_to:
+          type: string
+        sources:
+          type: array
+          items:
+            type: string
+        labels:
+          type: array
+          items:
+            type: string
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    LeadCreate:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          example: New Lead
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        subject:
+          type: string
+        pipeline_id:
+          type: integer
+        stage_id:
+          type: integer
+        user_id:
+          type: integer
+        notes:
+          type: string
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_name:
+          type: string
+        client:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        budget:
+          type: number
+          format: float
+        status:
+          type: string
+          enum: [not_started, in_progress, completed, on_hold]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        tasks_count:
+          type: integer
+        completed_tasks:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ProjectCreate:
+      type: object
+      required:
+        - project_name
+      properties:
+        project_name:
+          type: string
+          example: New Project
+        client_id:
+          type: integer
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        budget:
+          type: number
+          format: float
+        description:
+          type: string
+        status:
+          type: string
+          enum: [not_started, in_progress, completed, on_hold]
+          default: not_started
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        employee_id:
+          type: string
+          example: EMP-0001
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        dob:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [male, female]
+        address:
+          type: string
+        branch:
+          type: string
+        department:
+          type: string
+        designation:
+          type: string
+        date_of_joining:
+          type: string
+          format: date
+        salary_type:
+          type: string
+          enum: [monthly, hourly]
+        salary:
+          type: number
+          format: float
+        created_at:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Invalid or missing API token
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Access denied. Required scope not granted.
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Resource not found
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Validation failed
+            errors:
+              email:
+                - The email field is required.
+              name:
+                - The name field is required.
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+          description: Request limit per minute
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+          description: Remaining requests
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until limit resets
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                example: false
+              message:
+                type: string
+                example: Rate limit exceeded. Please try again later.
+              retry_after:
+                type: integer
+                example: 60
